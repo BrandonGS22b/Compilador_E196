@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import http.server
 import json
 import urllib.parse
-from compiler import Lexer, Parser, SemanticAnalyzer, LexicalError, SyntacticError
+from compiler import compilar
 
 # Directorio base absoluto para que Vercel y local encuentren los archivos
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -88,77 +88,10 @@ class handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(f"Error serializando JSON: {str(e)}".encode('utf-8'))
 
     def compile_expression(self, expression):
-        # 1. Obtener tokens
-        lexer = Lexer(expression)
         try:
-            tokens_objs = lexer.tokenize_all()
-            tokens_list = [t.to_dict() for t in tokens_objs]
-        except LexicalError as le:
-            return {
-                'status': 'lexical_error',
-                'message': le.args[0],
-                'position': le.position,
-                'char': le.char
-            }
+            return compilar(expression)
         except Exception as e:
-            return {
-                'status': 'error',
-                'message': f"Error léxico desconocido: {str(e)}"
-            }
-
-        # 2. Parsear (construir AST)
-        lexer_for_parser = Lexer(expression)
-        parser = Parser(lexer_for_parser)
-        try:
-            ast_root = parser.parse()
-            ast_dict = ast_root.to_dict()
-            ast_ascii = ast_root.to_ascii()
-        except SyntacticError as se:
-            return {
-                'status': 'syntax_error',
-                'message': se.args[0],
-                'position': se.position,
-                'token': se.token.to_dict() if se.token else None
-            }
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f"Error sintáctico desconocido: {str(e)}"
-            }
-
-        # 3. Análisis Semántico (Tablas de símbolos y tipos)
-        try:
-            analyzer = SemanticAnalyzer(ast_root)
-            sym_table, type_table = analyzer.analyze()
-            
-            formatted_sym_table = []
-            formatted_type_table = []
-            
-            sorted_symbols = sorted(sym_table.items(), key=lambda item: int(item[1].split('_')[1]))
-            
-            for symbol, addr in sorted_symbols:
-                formatted_sym_table.append({
-                    'symbol': symbol,
-                    'address': addr
-                })
-                formatted_type_table.append({
-                    'symbol': symbol,
-                    'type': type_table[symbol]
-                })
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f"Error semántico: {str(e)}"
-            }
-
-        return {
-            'status': 'success',
-            'tokens': tokens_list,
-            'ast': ast_dict,
-            'ast_ascii': ast_ascii,
-            'symbol_table': formatted_sym_table,
-            'type_table': formatted_type_table
-        }
+            return {'status': 'error', 'message': f'Error interno del compilador: {e}'}
 
 def run_server(port=PORT):
     server_address = ('', port)

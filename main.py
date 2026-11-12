@@ -14,97 +14,46 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-from compiler import Lexer, Parser, SemanticAnalyzer, LexicalError, SyntacticError
+from compiler import compilar
 from server import run_server
 
-def run_cli_mode(expression):
+def run_cli_mode(texto):
     print("=" * 60)
-    print(" SIMULACIÓN DE COMPILADOR ARITMÉTICO - MODO CLI")
+    print(" COMPILADOR ARITMÉTICO (PLY) - MODO CLI")
     print("=" * 60)
-    print(f"Expresión de entrada: '{expression}'\n")
-
-    # 1. Fase de Análisis Léxico
-    print("[1] ANALIZADOR LÉXICO:")
-    lexer = Lexer(expression)
-    try:
-        tokens = lexer.tokenize_all()
-        print("Tokens generados exitosamente:")
-        for t in tokens:
-            if t.type != 'EOF':
-                print(f"  - Tipo: {t.type:<18} | Valor: {repr(t.value):<10} | Posición: {t.position}")
-            else:
-                print(f"  - Tipo: {t.type:<18} | Valor: EOF        | Posición: {t.position}")
-        print()
-    except LexicalError as le:
-        print("ERROR LÉXICO DETECTADO:")
-        print(f"  Mensaje: {le.args[0]}")
-        print(f"  Fórmula: {expression}")
-        # Dibujar un puntero debajo de la posición del error
-        puntero = " " * (le.position + 11) + "^"
-        print(puntero)
-        print("=" * 60)
-        sys.exit(1)
-
-    # 2. Fase de Análisis Sintáctico
-    print("[2] ANALIZADOR SINTÁCTICO:")
-    lexer_for_parser = Lexer(expression)
-    parser = Parser(lexer_for_parser)
-    try:
-        ast_root = parser.parse()
-        print("Árbol de Sintaxis Abstracta (AST) generado:")
-        print(ast_root.to_ascii())
-    except SyntacticError as se:
-        print("ERROR SINTÁCTICO DETECTADO:")
-        print(f"  Mensaje: {se.args[0]}")
-        print(f"  Fórmula: {expression}")
-        puntero = " " * (se.position + 11) + "^"
-        print(puntero)
-        print("=" * 60)
-        sys.exit(1)
-
-    # 3. Fase de Análisis Semántico
-    print("[3] ANALIZADOR SEMÁNTICO BÁSICO:")
-    try:
-        analyzer = SemanticAnalyzer(ast_root)
-        symbol_table, type_table = analyzer.analyze()
-        
-        # Mostrar Tabla de Símbolos
-        print("Tabla de Símbolos:")
-        print(f"  {'Símbolo (Valor)':<16} | {'Dirección (Simulada)':<20}")
-        print("  " + "-" * 40)
-        
-        # Ordenar por dirección secuencial
-        sorted_symbols = sorted(symbol_table.items(), key=lambda item: int(item[1].split('_')[1]))
-        for symbol, addr in sorted_symbols:
-            print(f"  {symbol:<16} | {addr:<20}")
-        print()
-
-        # Mostrar Tabla de Tipos
-        print("Tabla de Tipos:")
-        print(f"  {'Símbolo (Valor)':<16} | {'Tipo de Dato':<20}")
-        print("  " + "-" * 40)
-        for symbol, addr in sorted_symbols:
-            print(f"  {symbol:<16} | {type_table[symbol]:<20}")
-            
-    except Exception as e:
-        print(f"ERROR SEMÁNTICO DETECTADO: {str(e)}")
-        print("=" * 60)
-        sys.exit(1)
-
-    print("=" * 60)
-    print(" PROCESAMIENTO COMPLETADO EXITOSAMENTE")
-    print("=" * 60)
+    r = compilar(texto)
+    if 'lines' not in r:
+        print(r.get('message')); sys.exit(1)
+    for l in r['lines']:
+        print(f"\n[Línea {l['line']}] {l['text']}")
+        print("  [1] Léxico :", ", ".join(f"{t['type']}({t['value']})" for t in l['tokens']))
+        for e in l['errors']:
+            print(f"  ERROR ({e['phase']}): {e['message']}")
+            print("   " + l['text']); print("   " + " " * e['position'] + "^")
+        if l['ast']:
+            print("  [2] Sintáctico (AST anotado con tipos):")
+            print("\n".join("      " + x for x in l['ast_ascii'].splitlines()))
+        if l['status'] == 'ok':
+            print(f"  [3] Semántico: valor = {l['valor']}  (tipo {l['tipo']})")
+    print("\nTabla de símbolos:")
+    print(f"  {'Lexema':<8}{'Tipo':<8}{'Ámbito':<8}{'Dir':<6}{'Valor':<10}{'Decl':<6}Refs")
+    for f in r['symbol_table']:
+        print(f"  {f['lexema']:<8}{f['tipo']:<8}{f['ambito']:<8}{f['direccion']:<6}{str(f['valor']):<10}{f['linea_decl']:<6}{f['lineas_ref']}")
+    sys.exit(0 if r['status'] == 'success' else 1)
 
 def main():
     parser = argparse.ArgumentParser(description="Simulador de Compilador Aritmético USB")
-    parser.add_argument('--cli', type=str, help="Ejecutar en consola con la expresión aritmética dada.")
+    parser.add_argument('--cli', type=str, help="Ejecutar en consola con el programa dado (usa \\n para varias líneas).")
+    parser.add_argument('--file', type=str, help="Ejecutar en consola leyendo un archivo de texto (una instrucción por línea).")
     parser.add_argument('--web', action='store_true', help="Iniciar en modo interfaz web (por defecto).")
     parser.add_argument('--port', type=int, default=8000, help="Puerto para el servidor web (por defecto: 8000).")
     
     args = parser.parse_args()
     
-    if args.cli:
-        run_cli_mode(args.cli)
+    if args.file:
+        run_cli_mode(open(args.file, encoding='utf-8').read())
+    elif args.cli:
+        run_cli_mode(args.cli.replace('\\n', '\n'))
     else:
         # Iniciar modo web por defecto
         # Abrir el navegador en un hilo ligero

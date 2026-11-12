@@ -522,6 +522,24 @@
                 stroke-dashoffset: -1000;
             }
         }
+
+        textarea#expression-input{width:100%;padding:1rem 1.2rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;color:var(--text-primary);font-family:'Fira Code',monospace;font-size:.95rem;resize:vertical;box-shadow:inset 0 2px 4px rgba(0,0,0,.2)}
+        textarea#expression-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-glow)}
+        .res-row{display:flex;gap:.75rem;align-items:center;padding:.5rem .7rem;border-radius:8px;cursor:pointer;border:1px solid transparent;font-size:.85rem}
+        .res-row:hover,.res-row.sel{background:rgba(255,255,255,.05);border-color:var(--border)}
+        .res-row code{font-family:'Fira Code',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .res-n{color:var(--text-secondary);font-size:.75rem}
+        .res-out{font-weight:600;color:var(--emerald)}
+        .res-row.lexical_error .res-out,.res-row.syntax_error .res-out,.res-row.semantic_error .res-out{color:var(--rose)}
+        .ast-content-pane{overflow:auto}
+        #symbol-table th,#symbol-table td,#type-table th,#type-table td{padding:.6rem .45rem;font-size:.8rem}
+        #symbol-table th,#type-table th{font-size:.68rem;letter-spacing:0}
+        .ast-viewer-container{height:560px}
+        .ast-svg-canvas{margin:0 auto}
+        .ast-content-pane,.table-container{scrollbar-width:thin;scrollbar-color:#374151 transparent}
+        .ast-content-pane::-webkit-scrollbar,.table-container::-webkit-scrollbar{width:8px;height:8px}
+        .ast-content-pane::-webkit-scrollbar-thumb,.table-container::-webkit-scrollbar-thumb{background:#374151;border-radius:8px}
+        .ast-content-pane::-webkit-scrollbar-track,.table-container::-webkit-scrollbar-track{background:transparent}
     </style>
 </head>
 <body>
@@ -529,7 +547,7 @@
     <header>
         <div class="header-title">
             <h1>Simulador de Compilador Aritmético</h1>
-            <p>Visualizador interactivo de las etapas iniciales de compilación</p>
+            <p>Léxico (PLY) · Sintáctico (PLY) · Semántico con tabla de símbolos</p>
         </div>
         <div class="badge-uni">Universitaria Tecnológica de Santander</div>
     </header>
@@ -541,12 +559,14 @@
             <div class="card">
                 <h2 class="card-title">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                    Expresión de Entrada
+                    Programa de Entrada (una instrucción por línea)
                 </h2>
                 
                 <div class="input-group">
                     <div class="input-wrapper">
-                        <input type="text" id="expression-input" placeholder="Ej: 10 + 20 * (30 - 5)" value="10 + 20 * (30 - 5)">
+                        <textarea id="expression-input" rows="5" spellcheck="false" placeholder="Una instrucción por línea">x = (1 + 5) * 20 / 5
+Evaluar[-(1.6+1.45)];
+y = x + w</textarea>
                     </div>
                     
                     <button class="btn-compile" id="compile-btn">
@@ -558,11 +578,13 @@
                 <div style="margin-top: 1rem;">
                     <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Prueba con estos ejemplos:</p>
                     <div class="examples-list">
-                        <span class="example-chip" onclick="loadExample('10 + 25')">10 + 25</span>
-                        <span class="example-chip" onclick="loadExample('2 * 3 + 4 / 2')">2 * 3 + 4 / 2</span>
-                        <span class="example-chip" onclick="loadExample('100 * (5 - 3) / 2')">100 * (5 - 3) / 2</span>
-                        <span class="example-chip" onclick="loadExample('10 + 2a * 3')">Error Léxico (2a)</span>
-                        <span class="example-chip" onclick="loadExample('5 + * 3')">Error Sintáctico</span>
+                        <span class="example-chip" onclick="loadExample('x = (1 + 5) * 20 / 5')">PDF 3: asignación</span>
+<span class="example-chip" onclick="loadExample('Evaluar[1+1];\nEvaluar[1+1*2];\nEvaluar[-(1+1*6/3-5+1*-2)];\nEvaluar[-(1.6+1.45)];')">PDF 2: Evaluar</span>
+<span class="example-chip" onclick="loadExample('a = 4\nb = a * 2.5\nEvaluar[b / 2]')">Tipos y variables</span>
+<span class="example-chip" onclick="loadExample('y = 25 + (5 / 6) - 100 + w')">No declarada</span>
+<span class="example-chip" onclick="loadExample('z = {23}{23}\nw= 32 # 5')">Errores léxicos</span>
+<span class="example-chip" onclick="loadExample('Evaluar[5 + * 3]')">Sintáctico</span>
+<span class="example-chip" onclick="loadExample('x = 10 / 0')">División por 0</span>
                     </div>
                 </div>
             </div>
@@ -580,13 +602,12 @@
                         <table id="symbol-table">
                             <thead>
                                 <tr>
-                                    <th>Símbolo (Valor)</th>
-                                    <th>Dirección de Memoria</th>
+                                    <th>Lexema</th><th>Dirección</th><th>Valor</th><th>Decl.</th><th>Refs.</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td colspan="2" class="empty-table-text">No hay símbolos analizados</td>
+                                    <td colspan="5" class="empty-table-text">No hay símbolos analizados</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -599,13 +620,12 @@
                         <table id="type-table">
                             <thead>
                                 <tr>
-                                    <th>Símbolo</th>
-                                    <th>Tipo de Dato</th>
+                                    <th>Lexema</th><th>Tipo</th><th>Ámbito</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td colspan="2" class="empty-table-text">No hay tipos analizados</td>
+                                    <td colspan="3" class="empty-table-text">No hay tipos analizados</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -617,6 +637,7 @@
         <!-- Columna Derecha: Output Visual del Compilador -->
         <section class="workspace">
             
+            <div class="card"><h2 class="card-title">Resultados por línea (clic para ver sus fases)</h2><div id="results-list"></div></div>
             <!-- Alerta de Errores -->
             <div class="error-panel" id="error-panel">
                 <div class="error-header">
@@ -674,749 +695,121 @@
     </footer>
 
     <script>
-        // =====================================================================
-        // MOTOR DEL COMPILADOR EN JAVASCRIPT (EJECUCIÓN NATIVA EN EL NAVEGADOR)
-        // =====================================================================
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        const TIPOS = {NUMBER:'Entero',DECIMAL:'Decimal',ID:'Identif.',PLUS:'Suma',MINUS:'Resta',TIMES:'Multipl.',DIVIDE:'División',
+            LPAREN:'Par. Izq.',RPAREN:'Par. Der.',EQUAL:'Igual',LBRACKET:'Cor. Izq.',RBRACKET:'Cor. Der.',SEMI:'Punto y coma',EVALUAR:'Evaluar'};
+        let ultimo = null, sel = 0;
 
-        const TokenType = {
-            INT: 'ENTERO',
-            PLUS: 'MAS',
-            MINUS: 'MENOS',
-            MUL: 'MULTIPLICACION',
-            DIV: 'DIVISION',
-            LPAREN: 'PARENTESIS_IZQ',
-            RPAREN: 'PARENTESIS_DER',
-            EOF: 'EOF'
-        };
+        function loadExample(v) { $('expression-input').value = v; compileExpression(); }
 
-        class Token {
-            constructor(type, value, position) {
-                this.type = type;
-                this.value = value;
-                this.position = position;
-            }
-            toDict() {
-                return {
-                    type: this.type,
-                    value: this.value,
-                    position: this.position
-                };
-            }
+        function switchASTTab(tab) {
+            const tabs = document.querySelectorAll('.ast-tab'), panes = document.querySelectorAll('.ast-content-pane');
+            tabs.forEach(t => t.classList.remove('active')); panes.forEach(p => p.classList.remove('active'));
+            const i = tab === 'graph' ? 0 : 1;
+            tabs[i].classList.add('active'); panes[i].classList.add('active');
         }
 
-        class LexicalError extends Error {
-            constructor(message, position, char) {
-                super(message);
-                this.position = position;
-                this.char = char;
-            }
-        }
-
-        class SyntacticError extends Error {
-            constructor(message, position, token) {
-                super(message);
-                this.position = position;
-                this.token = token;
-            }
-        }
-
-        // --- Analizador Léxico (Lexer) ---
-        class Lexer {
-            constructor(text) {
-                this.text = text || '';
-                this.pos = 0;
-                this.currentChar = this.text.length > 0 ? this.text[0] : null;
-            }
-
-            advance() {
-                this.pos++;
-                if (this.pos > this.text.length - 1) {
-                    this.currentChar = null;
-                } else {
-                    this.currentChar = this.text[this.pos];
-                }
-            }
-
-            skipWhitespace() {
-                while (this.currentChar !== null && /\s/.test(this.currentChar)) {
-                    this.advance();
-                }
-            }
-
-            integer() {
-                const startPos = this.pos;
-                let result = '';
-                while (this.currentChar !== null && /[0-9]/.test(this.currentChar)) {
-                    result += this.currentChar;
-                    this.advance();
-                }
-                return new Token(TokenType.INT, parseInt(result, 10), startPos);
-            }
-
-            getNextToken() {
-                while (this.currentChar !== null) {
-                    if (/\s/.test(this.currentChar)) {
-                        this.skipWhitespace();
-                        continue;
-                    }
-
-                    if (/[0-9]/.test(this.currentChar)) {
-                        return this.integer();
-                    }
-
-                    if (this.currentChar === '+') {
-                        const token = new Token(TokenType.PLUS, '+', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    if (this.currentChar === '-') {
-                        const token = new Token(TokenType.MINUS, '-', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    if (this.currentChar === '*') {
-                        const token = new Token(TokenType.MUL, '*', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    if (this.currentChar === '/') {
-                        const token = new Token(TokenType.DIV, '/', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    if (this.currentChar === '(') {
-                        const token = new Token(TokenType.LPAREN, '(', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    if (this.currentChar === ')') {
-                        const token = new Token(TokenType.RPAREN, ')', this.pos);
-                        this.advance();
-                        return token;
-                    }
-
-                    // Carácter no permitido -> Error léxico
-                    const char = this.currentChar;
-                    const pos = this.pos;
-                    this.advance();
-                    throw new LexicalError(
-                        `Carácter no válido '${char}' encontrado en la posición ${pos}.`,
-                        pos,
-                        char
-                    );
-                }
-
-                return new Token(TokenType.EOF, null, this.pos);
-            }
-
-            tokenizeAll() {
-                const tokens = [];
-                const lexerClone = new Lexer(this.text);
-                while (true) {
-                    const token = lexerClone.getNextToken();
-                    tokens.push(token);
-                    if (token.type === TokenType.EOF) {
-                        break;
-                    }
-                }
-                return tokens;
-            }
-        }
-
-        // --- Nodos del AST ---
-        class NumNode {
-            constructor(token) {
-                this.token = token;
-                this.value = token.value;
-            }
-            toDict() {
-                return {
-                    type: 'Num',
-                    value: this.value,
-                    position: this.token.position
-                };
-            }
-            toAscii(prefix = "", isLast = true) {
-                const marker = isLast ? "└── " : "├── ";
-                return `${prefix}${marker}Num(${this.value})\n`;
-            }
-        }
-
-        class BinOpNode {
-            constructor(left, opToken, right) {
-                this.left = left;
-                this.opToken = opToken;
-                this.op = opToken.value;
-                this.right = right;
-            }
-            toDict() {
-                return {
-                    type: 'BinOp',
-                    op: this.op,
-                    position: this.opToken.position,
-                    left: this.left.toDict(),
-                    right: this.right.toDict()
-                };
-            }
-            toAscii(prefix = "", isLast = true) {
-                const marker = isLast ? "└── " : "├── ";
-                let result = `${prefix}${marker}Op(${this.op})\n`;
-                const newPrefix = prefix + (isLast ? "    " : "│   ");
-                result += this.left.toAscii(newPrefix, false);
-                result += this.right.toAscii(newPrefix, true);
-                return result;
-            }
-        }
-
-        // --- Analizador Sintáctico (Parser) ---
-        class Parser {
-            constructor(lexer) {
-                this.lexer = lexer;
-                this.currentToken = this.lexer.getNextToken();
-            }
-
-            error(message) {
-                throw new SyntacticError(message, this.currentToken.position, this.currentToken);
-            }
-
-            consume(tokenType) {
-                if (this.currentToken.type === tokenType) {
-                    this.currentToken = this.lexer.getNextToken();
-                } else {
-                    this.error(`Se esperaba token ${tokenType}, pero se obtuvo ${this.currentToken.type}`);
-                }
-            }
-
-            factor() {
-                const token = this.currentToken;
-                if (token.type === TokenType.INT) {
-                    this.consume(TokenType.INT);
-                    return new NumNode(token);
-                } else if (token.type === TokenType.LPAREN) {
-                    this.consume(TokenType.LPAREN);
-                    const node = this.expr();
-                    if (this.currentToken.type !== TokenType.RPAREN) {
-                        this.error("Falta paréntesis de cierre ')'");
-                    }
-                    this.consume(TokenType.RPAREN);
-                    return node;
-                } else {
-                    this.error(`Se esperaba un número o un paréntesis de apertura, pero se encontró '${token.value !== null && token.value !== undefined ? token.value : token.type}'`);
-                }
-            }
-
-            term() {
-                let node = this.factor();
-                while (this.currentToken.type === TokenType.MUL || this.currentToken.type === TokenType.DIV) {
-                    const token = this.currentToken;
-                    if (token.type === TokenType.MUL) {
-                        this.consume(TokenType.MUL);
-                    } else if (token.type === TokenType.DIV) {
-                        this.consume(TokenType.DIV);
-                    }
-                    node = new BinOpNode(node, token, this.factor());
-                }
-                return node;
-            }
-
-            expr() {
-                let node = this.term();
-                while (this.currentToken.type === TokenType.PLUS || this.currentToken.type === TokenType.MINUS) {
-                    const token = this.currentToken;
-                    if (token.type === TokenType.PLUS) {
-                        this.consume(TokenType.PLUS);
-                    } else if (token.type === TokenType.MINUS) {
-                        this.consume(TokenType.MINUS);
-                    }
-                    node = new BinOpNode(node, token, this.term());
-                }
-                return node;
-            }
-
-            parse() {
-                const node = this.expr();
-                if (this.currentToken.type !== TokenType.EOF) {
-                    this.error(`Carácter inesperado o fin de expresión no alcanzado. Token sobrante: ${this.currentToken.value || this.currentToken.type}`);
-                }
-                return node;
-            }
-        }
-
-        // --- Analizador Semántico (SemanticAnalyzer) ---
-        class SemanticAnalyzer {
-            constructor(ast) {
-                this.ast = ast;
-            }
-
-            collectNumbers(node, set) {
-                if (!node) return;
-                if (node instanceof NumNode) {
-                    set.add(node.value);
-                } else if (node instanceof BinOpNode) {
-                    this.collectNumbers(node.left, set);
-                    this.collectNumbers(node.right, set);
-                }
-            }
-
-            analyze() {
-                const set = new Set();
-                this.collectNumbers(this.ast, set);
-                const uniqueNumbers = Array.from(set).sort((a, b) => a - b);
-                
-                const formattedSymTable = [];
-                const formattedTypeTable = [];
-
-                uniqueNumbers.forEach((num, index) => {
-                    const addr = `dir_${index + 1}`;
-                    formattedSymTable.push({
-                        symbol: num,
-                        address: addr
-                    });
-                    formattedTypeTable.push({
-                        symbol: num,
-                        type: 'entero'
-                    });
-                });
-
-                return {
-                    symbolTable: formattedSymTable,
-                    typeTable: formattedTypeTable
-                };
-            }
-        }
-
-        function runCompilerLocally(expression) {
-            if (!expression || expression.trim() === '') {
-                return {
-                    status: 'error',
-                    message: 'Por favor, ingresa una expresión aritmética.'
-                };
-            }
-
-            // 1. Léxico
-            let tokensList = [];
+        async function compileExpression() {
             try {
-                const lexer = new Lexer(expression);
-                const tokenObjs = lexer.tokenizeAll();
-                tokensList = tokenObjs.map(t => t.toDict());
-            } catch (le) {
-                if (le instanceof LexicalError) {
-                    return {
-                        status: 'lexical_error',
-                        message: le.message,
-                        position: le.position,
-                        char: le.char
-                    };
-                }
-                return {
-                    status: 'error',
-                    message: `Error léxico desconocido: ${le.message}`
-                };
-            }
-
-            // 2. Sintáctico (AST)
-            let astRoot = null;
-            let astDict = null;
-            let astAscii = '';
-            try {
-                const lexerForParser = new Lexer(expression);
-                const parser = new Parser(lexerForParser);
-                astRoot = parser.parse();
-                astDict = astRoot.toDict();
-                astAscii = astRoot.toAscii();
-            } catch (se) {
-                if (se instanceof SyntacticError) {
-                    return {
-                        status: 'syntax_error',
-                        message: se.message,
-                        position: se.position,
-                        token: se.token ? se.token.toDict() : null
-                    };
-                }
-                return {
-                    status: 'error',
-                    message: `Error sintáctico desconocido: ${se.message}`
-                };
-            }
-
-            // 3. Semántico (Tablas)
-            try {
-                const analyzer = new SemanticAnalyzer(astRoot);
-                const { symbolTable, typeTable } = analyzer.analyze();
-                return {
-                    status: 'success',
-                    tokens: tokensList,
-                    ast: astDict,
-                    ast_ascii: astAscii,
-                    symbol_table: symbolTable,
-                    type_table: typeTable
-                };
+                const r = await fetch('/api/compile', {method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({expression: $('expression-input').value})});
+                ultimo = await r.json();
             } catch (e) {
-                return {
-                    status: 'error',
-                    message: `Error semántico: ${e.message}`
-                };
+                ultimo = {status:'error', message:'No se pudo contactar el servidor. Ejecuta "python main.py" y abre http://localhost:8000.'};
             }
+            sel = 0; render();
         }
 
-        // Cargar ejemplo en la caja de texto
-        function loadExample(val) {
-            document.getElementById('expression-input').value = val;
-            compileExpression();
-        }
-
-        // Cambiar pestañas del AST
-        function switchASTTab(tabName) {
-            const tabs = document.querySelectorAll('.ast-tab');
-            const panes = document.querySelectorAll('.ast-content-pane');
-            
-            tabs.forEach(t => t.classList.remove('active'));
-            panes.forEach(p => p.classList.remove('active'));
-
-            if (tabName === 'graph') {
-                tabs[0].classList.add('active');
-                document.getElementById('ast-graph-pane').classList.add('active');
-            } else {
-                tabs[1].classList.add('active');
-                document.getElementById('ast-ascii-pane').classList.add('active');
+        function render() {
+            const list = $('results-list');
+            if (!ultimo.lines) {
+                list.innerHTML = ''; displayTokens([]); displayTables([]); clearAST();
+                $('error-title').textContent = 'Error'; $('error-msg').textContent = ultimo.message || 'Error desconocido';
+                $('error-highlight').innerHTML = ''; $('error-panel').style.display = 'flex'; return;
             }
+            displayTables(ultimo.symbol_table);
+            list.innerHTML = ultimo.lines.map((l, i) => {
+                const out = l.status === 'ok' ? `= ${esc(l.valor)} <small>(${l.tipo})</small>` : '✗ ' + esc(l.errors[0].phase);
+                return `<div class="res-row ${l.status} ${i === sel ? 'sel' : ''}" onclick="selectLine(${i})"><span class="res-n">L${l.line}</span><code>${esc(l.text)}</code><span class="res-out">${out}</span></div>`;
+            }).join('');
+            showLine(ultimo.lines[sel]);
         }
 
-        // Ejecutar compilación directamente en el navegador
-        function compileExpression() {
-            const expr = document.getElementById('expression-input').value;
-            
-            // Limpiar errores e interfaz
-            hideError();
-            
-            try {
-                const result = runCompilerLocally(expr);
-                
-                if (result.status === 'success') {
-                    displayTokens(result.tokens);
-                    displayTables(result.symbol_table, result.type_table);
-                    renderASTGraph(result.ast);
-                    displayASTAscii(result.ast_ascii);
-                } else if (result.status === 'lexical_error') {
-                    displayTokens([]);
-                    displayTables([], []);
-                    clearAST();
-                    showLexicalError(result.message, result.position, result.char, expr);
-                } else if (result.status === 'syntax_error') {
-                    displayTokens([]);
-                    displayTables([], []);
-                    clearAST();
-                    showSyntaxError(result.message, result.position, result.token, expr);
-                } else {
-                    displayTokens([]);
-                    displayTables([], []);
-                    clearAST();
-                    showGeneralError(result.message || 'Error desconocido');
-                }
-            } catch (err) {
-                showGeneralError('Ocurrió un error inesperado al procesar la expresión: ' + err.message);
-            }
+        function selectLine(i) { sel = i; render(); }
+
+        function showLine(l) {
+            displayTokens(l.tokens); showErrors(l);
+            if (l.ast) { renderASTGraph(l.ast); $('ast-ascii-code').textContent = l.ast_ascii; } else clearAST();
         }
 
-        // Mostrar Tokens
+        function showErrors(l) {
+            if (!l.errors.length) { $('error-panel').style.display = 'none'; return; }
+            $('error-title').textContent = 'Errores detectados (línea ' + l.line + ')';
+            $('error-msg').innerHTML = l.errors.map(e => `<div>• <b>${esc(e.phase)}:</b> ${esc(e.message)}</div>`).join('');
+            const arr = Array(Math.max(...l.errors.map(e => e.position)) + 1).fill(' ');
+            l.errors.forEach(e => arr[e.position] = '^');
+            $('error-highlight').innerHTML = `<div>${esc(l.text)}</div><div class="error-pointer">${esc(arr.join(''))}</div>`;
+            $('error-panel').style.display = 'flex';
+        }
+
         function displayTokens(tokens) {
-            const track = document.getElementById('tokens-track');
-            track.innerHTML = '';
-            
-            if (tokens.length === 0) {
-                track.innerHTML = `<div style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; width: 100%; text-align: center; padding: 1rem 0;">No se generaron tokens.</div>`;
-                return;
-            }
-            
-            tokens.forEach((t, index) => {
-                const card = document.createElement('div');
-                card.className = 'token-card';
-                card.style.animationDelay = `${index * 40}ms`;
-                
-                // Determinar subtipo estético
-                if (t.type === 'ENTERO') {
-                    card.classList.add('int');
-                } else if (['MAS', 'MENOS', 'MULTIPLICACION', 'DIVISION'].includes(t.type)) {
-                    card.classList.add('op');
-                } else if (['PARENTESIS_IZQ', 'PARENTESIS_DER'].includes(t.type)) {
-                    card.classList.add('paren');
-                } else if (t.type === 'EOF') {
-                    card.classList.add('eof');
-                }
-                
-                const valueText = t.value === null ? 'EOF' : t.value;
-                const typeText = translateTokenType(t.type);
-                
-                card.innerHTML = `
-                    <span class="token-val">${escapeHtml(valueText.toString())}</span>
-                    <span class="token-type-lbl">${escapeHtml(typeText)}</span>
-                `;
-                
-                track.appendChild(card);
+            const track = $('tokens-track'); track.innerHTML = '';
+            if (!tokens.length) { track.innerHTML = '<div style="color:var(--text-secondary);font-size:.85rem;font-style:italic;width:100%;text-align:center;padding:1rem 0;">No se generaron tokens.</div>'; return; }
+            tokens.forEach((t, i) => {
+                const c = document.createElement('div'); c.className = 'token-card'; c.style.animationDelay = `${i * 40}ms`;
+                if (['NUMBER','DECIMAL'].includes(t.type)) c.classList.add('int');
+                else if (['PLUS','MINUS','TIMES','DIVIDE','EQUAL'].includes(t.type)) c.classList.add('op');
+                else if (['LPAREN','RPAREN','LBRACKET','RBRACKET'].includes(t.type)) c.classList.add('paren');
+                c.title = `línea ${t.line}, posición ${t.position}`;
+                c.innerHTML = `<span class="token-val">${esc(t.value)}</span><span class="token-type-lbl">${esc(TIPOS[t.type] || t.type)}</span>`;
+                track.appendChild(c);
             });
         }
 
-        function translateTokenType(type) {
-            switch(type) {
-                case 'ENTERO': return 'Entero';
-                case 'MAS': return 'Suma';
-                case 'MENOS': return 'Resta';
-                case 'MULTIPLICACION': return 'Multipl.';
-                case 'DIVISION': return 'División';
-                case 'PARENTESIS_IZQ': return 'Par. Izq.';
-                case 'PARENTESIS_DER': return 'Par. Der.';
-                case 'EOF': return 'Fin Arch.';
-                default: return type;
+        function displayTables(rows) {
+            const sb = document.querySelector('#symbol-table tbody'), tb = document.querySelector('#type-table tbody');
+            if (!rows || !rows.length) {
+                sb.innerHTML = '<tr><td colspan="5" class="empty-table-text">No hay símbolos analizados</td></tr>';
+                tb.innerHTML = '<tr><td colspan="3" class="empty-table-text">No hay tipos analizados</td></tr>'; return;
             }
+            sb.innerHTML = rows.map(r => `<tr><td style="font-weight:600">${esc(r.lexema)}</td><td><span class="badge-addr">${r.direccion}</span></td><td>${esc(r.valor)}</td><td>${r.linea_decl}</td><td>${r.lineas_ref.join(', ') || '—'}</td></tr>`).join('');
+            tb.innerHTML = rows.map(r => `<tr><td style="font-weight:600">${esc(r.lexema)}</td><td><span class="badge-type">${r.tipo}</span></td><td>${r.ambito}</td></tr>`).join('');
         }
 
-        // Mostrar Tablas Semánticas
-        function displayTables(symTable, typeTable) {
-            const symBody = document.querySelector('#symbol-table tbody');
-            const typeBody = document.querySelector('#type-table tbody');
-            
-            symBody.innerHTML = '';
-            typeBody.innerHTML = '';
-            
-            if (symTable.length === 0) {
-                symBody.innerHTML = `<tr><td colspan="2" class="empty-table-text">No hay símbolos analizados</td></tr>`;
-            } else {
-                symTable.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="font-weight: 600;">${row.symbol}</td>
-                        <td><span class="badge-addr">${row.address}</span></td>
-                    `;
-                    symBody.appendChild(tr);
-                });
-            }
-            
-            if (typeTable.length === 0) {
-                typeBody.innerHTML = `<tr><td colspan="2" class="empty-table-text">No hay tipos analizados</td></tr>`;
-            } else {
-                typeTable.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td style="font-weight: 600;">${row.symbol}</td>
-                        <td><span class="badge-type">${row.type}</span></td>
-                    `;
-                    typeBody.appendChild(tr);
-                });
-            }
-        }
-
-        // Mostrar AST en formato ASCII texto
-        function displayASTAscii(text) {
-            document.getElementById('ast-ascii-code').textContent = text;
-        }
-
-        // Limpiar el AST
         function clearAST() {
-            document.getElementById('ast-svg').innerHTML = '';
-            document.getElementById('ast-ascii-code').textContent = 'No hay árbol disponible debido a un error.';
+            $('ast-svg').innerHTML = '';
+            $('ast-ascii-code').textContent = 'No hay árbol disponible para esta línea.';
         }
 
-        // Renderizar el AST como un gráfico SVG interactivo
-        function renderASTGraph(astData) {
-            const svg = document.getElementById('ast-svg');
+        // Árbol "tidy": cada hoja ocupa una columna y el padre se centra sobre sus hijos (no se corta nunca)
+        function renderASTGraph(root) {
+            const svg = $('ast-svg'), NS = 'http://www.w3.org/2000/svg', DX = 70, DY = 80, M = 50;
             svg.innerHTML = '';
-            
-            if (!astData) return;
-
-            // Determinar dimensiones dinámicas del SVG
-            const width = svg.clientWidth || 800;
-            const height = svg.clientHeight || 380;
-            
-            // Paso 1: Computar la profundidad y el ancho de cada subárbol para posicionamiento inteligente
-            function computeLayoutInfo(node) {
-                if (!node) return null;
-                
-                if (node.type === 'Num') {
-                    return {
-                        node: node,
-                        width: 60,
-                        height: 50,
-                        depth: 1
-                    };
-                }
-                
-                const leftLayout = computeLayoutInfo(node.left);
-                const rightLayout = computeLayoutInfo(node.right);
-                
-                return {
-                    node: node,
-                    left: leftLayout,
-                    right: rightLayout,
-                    width: (leftLayout.width + rightLayout.width) + 40,
-                    height: Math.max(leftLayout.height, rightLayout.height) + 80,
-                    depth: Math.max(leftLayout.depth, rightLayout.depth) + 1
-                };
-            }
-            
-            const layout = computeLayoutInfo(astData);
-            
-            // Ajustar el viewBox para que el árbol se auto-ajuste y sea responsivo
-            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-            
-            // Paso 2: Dibujar el árbol recursivamente
-            const verticalSpacing = height / (layout.depth + 0.5 || 2);
-            
-            function drawNode(nodeLayout, x, y, parentX = null, parentY = null) {
-                if (!nodeLayout) return;
-                
-                // Si hay nodo padre, dibujar línea de conexión (arista) primero para que quede debajo de las esferas
-                if (parentX !== null && parentY !== null) {
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', parentX);
-                    line.setAttribute('y1', parentY);
-                    line.setAttribute('x2', x);
-                    line.setAttribute('y2', y);
-                    line.setAttribute('class', 'edge-line');
-                    svg.appendChild(line);
-                }
-                
-                const node = nodeLayout.node;
-                const isOp = node.type === 'BinOp';
-                
-                // Dibujar círculo del nodo
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('cx', x);
-                circle.setAttribute('cy', y);
-                circle.setAttribute('r', isOp ? 22 : 18);
-                circle.setAttribute('class', `node-circle ${isOp ? 'op-node' : 'num-node'}`);
-                
-                // Animación hover interactiva
-                circle.addEventListener('mouseover', () => {
-                    circle.style.transform = 'scale(1.15)';
-                    circle.style.transformOrigin = `${x}px ${y}px`;
-                    circle.style.filter = 'drop-shadow(0 0 8px var(--primary))';
-                });
-                circle.addEventListener('mouseout', () => {
-                    circle.style.transform = 'scale(1)';
-                    circle.style.filter = 'none';
-                });
-                
-                // Texto del nodo
-                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                text.setAttribute('x', x);
-                text.setAttribute('y', y);
-                text.setAttribute('class', 'node-text');
-                text.textContent = isOp ? node.op : node.value;
-                
-                // Si es un operador, agregar title tooltip
-                if (isOp) {
-                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                    title.textContent = `Operador: ${node.op}`;
-                    circle.appendChild(title);
-                } else {
-                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                    title.textContent = `Valor constante: ${node.value}`;
-                    circle.appendChild(title);
-                }
-                
-                // Dibujar hijos recursivamente distribuyendo el ancho disponible
-                if (isOp) {
-                    const leftWidth = nodeLayout.left.width;
-                    const rightWidth = nodeLayout.right.width;
-                    const totalChildWidth = leftWidth + rightWidth;
-                    
-                    // El espacio horizontal total asignado a este subárbol
-                    const childSpacingFactor = Math.min(150, (width * 0.8) / Math.pow(2, y / verticalSpacing));
-                    
-                    const leftX = x - childSpacingFactor;
-                    const rightX = x + childSpacingFactor;
-                    const childY = y + verticalSpacing;
-                    
-                    drawNode(nodeLayout.left, leftX, childY, x, y);
-                    drawNode(nodeLayout.right, rightX, childY, x, y);
-                }
-                
-                // Agregar círculo y texto al SVG
-                svg.appendChild(circle);
-                svg.appendChild(text);
-            }
-            
-            // Iniciar dibujo desde la raíz en el centro superior
-            drawNode(layout, width / 2, 40);
+            let leaf = 0, maxD = 0;
+            (function place(n, d) {
+                n._d = d; maxD = Math.max(maxD, d);
+                if (!n.children.length) n._x = leaf++ * DX;
+                else { n.children.forEach(c => place(c, d + 1)); n._x = (n.children[0]._x + n.children[n.children.length - 1]._x) / 2; }
+            })(root, 0);
+            const W = Math.max(leaf - 1, 0) * DX + 2 * M + 40, H = maxD * DY + 2 * M + 10;
+            svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.style.width = W + 'px'; svg.style.height = H + 'px';
+            const px = n => n._x + M + 20, py = n => n._d * DY + M;
+            const el = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); svg.appendChild(e); return e; };
+            (function edges(n) { n.children.forEach(c => { el('line', {x1:px(n), y1:py(n), x2:px(c), y2:py(c), class:'edge-line'}); edges(c); }); })(root);
+            (function nodes(n) {
+                const w = Math.max(36, n.short.length * 9 + 16);
+                const r = el('rect', {x:px(n) - w / 2, y:py(n) - 17, width:w, height:34, rx:17, class:`node-circle ${['op','stmt'].includes(n.kind) ? 'op-node' : 'num-node'}`});
+                const t = document.createElementNS(NS, 'title'); t.textContent = n.label + (n.tipo ? ' : ' + n.tipo : ''); r.appendChild(t);
+                const tx = el('text', {x:px(n), y:py(n), class:'node-text'}); tx.textContent = n.short;
+                if (n.tipo) { const s = el('text', {x:px(n), y:py(n) + 30, 'text-anchor':'middle', 'font-size':'10', fill:'#9ca3af'}); s.textContent = n.tipo; }
+                n.children.forEach(nodes);
+            })(root);
         }
 
-        // Manejo de Errores Visuales
-        function showLexicalError(message, position, char, originalExpr) {
-            const panel = document.getElementById('error-panel');
-            document.getElementById('error-title').textContent = 'Error Léxico Encontrado';
-            document.getElementById('error-msg').textContent = message;
-            
-            // Generar el puntero en texto monoespaciado
-            let pointerLine = '';
-            for (let i = 0; i < position; i++) {
-                pointerLine += ' ';
-            }
-            pointerLine += '^';
-            
-            const highlightHtml = `<div>${escapeHtml(originalExpr)}</div><div class="error-pointer">${escapeHtml(pointerLine)}</div>`;
-            document.getElementById('error-highlight').innerHTML = highlightHtml;
-            
-            panel.style.display = 'flex';
-        }
-
-        function showSyntaxError(message, position, token, originalExpr) {
-            const panel = document.getElementById('error-panel');
-            document.getElementById('error-title').textContent = 'Error Sintáctico Encontrado';
-            document.getElementById('error-msg').textContent = message;
-            
-            let pointerLine = '';
-            for (let i = 0; i < position; i++) {
-                pointerLine += ' ';
-            }
-            pointerLine += '^';
-            
-            const highlightHtml = `<div>${escapeHtml(originalExpr)}</div><div class="error-pointer">${escapeHtml(pointerLine)}</div>`;
-            document.getElementById('error-highlight').innerHTML = highlightHtml;
-            
-            panel.style.display = 'flex';
-        }
-
-        function showGeneralError(message) {
-            const panel = document.getElementById('error-panel');
-            document.getElementById('error-title').textContent = 'Error General';
-            document.getElementById('error-msg').textContent = message;
-            document.getElementById('error-highlight').innerHTML = '';
-            panel.style.display = 'flex';
-        }
-
-        function hideError() {
-            document.getElementById('error-panel').style.display = 'none';
-        }
-
-        // Helpers de escape HTML
-        function escapeHtml(str) {
-            return str
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // Agregar listener de click al botón
-        document.getElementById('compile-btn').addEventListener('click', compileExpression);
-        
-        // Agregar listener de enter en el input
-        document.getElementById('expression-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                compileExpression();
-            }
-        });
-
-        // Ejecutar compilación inicial al cargar
-        window.addEventListener('load', () => {
-            compileExpression();
-        });
+        $('compile-btn').addEventListener('click', compileExpression);
+        $('expression-input').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) compileExpression(); });
+        window.addEventListener('load', compileExpression);
     </script>
 </body>
 </html>

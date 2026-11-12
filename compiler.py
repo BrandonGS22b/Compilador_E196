@@ -1,300 +1,363 @@
-import re
+"""Compilador aritmético: léxico + sintáctico (PLY) + semántico.
 
-# =====================================================================
-# Definición de Tokens
-# =====================================================================
-class TokenType:
-    INT = 'ENTERO'
-    PLUS = 'MAS'
-    MINUS = 'MENOS'
-    MUL = 'MULTIPLICACION'
-    DIV = 'DIVISION'
-    LPAREN = 'PARENTESIS_IZQ'
-    RPAREN = 'PARENTESIS_DER'
-    EOF = 'EOF'
+Cada línea del programa es una instrucción:
+    x = (1 + 5) * 20 / 5      asignación (declara/actualiza la variable)
+    Evaluar[1 + 1];           evaluación (PDF 2)
+    3 + 4                     expresión suelta
+"""
+import ply.lex as lex
+import ply.yacc as yacc
 
-class Token:
-    def __init__(self, type_, value, position):
-        self.type = type_
-        self.value = value
-        self.position = position  # Índice inicial en la cadena de texto
-
-    def __repr__(self):
-        return f"Token({self.type}, {repr(self.value)}, pos={self.position})"
-
-    def to_dict(self):
-        return {
-            'type': self.type,
-            'value': self.value,
-            'position': self.position
-        }
+RESERVADAS = {'Evaluar': 'EVALUAR'}
+TOKENS = ('ID', 'NUMBER', 'DECIMAL', 'PLUS', 'MINUS', 'TIMES', 'DIVIDE',
+          'LPAREN', 'RPAREN', 'EQUAL', 'LBRACKET', 'RBRACKET', 'SEMI', 'EVALUAR')
+TAMANO = {'entero': 4, 'real': 8}   # bytes simulados para la dirección
 
 
-# =====================================================================
-# Excepciones del Compilador
-# =====================================================================
-class LexicalError(Exception):
-    def __init__(self, message, position, char):
+class SemanticError(Exception):
+    def __init__(self, message, position, line):
         super().__init__(message)
         self.position = position
-        self.char = char
-
-
-class SyntacticError(Exception):
-    def __init__(self, message, position, token):
-        super().__init__(message)
-        self.position = position
-        self.token = token
+        self.line = line
 
 
 # =====================================================================
-# Analizador Léxico (Lexer)
+# Analizador léxico (PLY)
 # =====================================================================
-class Lexer:
-    def __init__(self, text):
-        self.text = text
-        self.pos = 0
-        self.current_char = self.text[0] if len(self.text) > 0 else None
+class Lexico:
+    tokens = TOKENS
+    t_PLUS = r'\+'
+    t_MINUS = r'-'
+    t_TIMES = r'\*'
+    t_DIVIDE = r'/'
+    t_LPAREN = r'\('
+    t_RPAREN = r'\)'
+    t_EQUAL = r'='
+    t_LBRACKET = r'\['
+    t_RBRACKET = r'\]'
+    t_SEMI = r';'
+    t_ignore = ' \t\r'
 
-    def advance(self):
-        self.pos += 1
-        if self.pos > len(self.text) - 1:
-            self.current_char = None
-        else:
-            self.current_char = self.text[self.pos]
+    def __init__(self):
+        self.errores = []
+        self.lexer = lex.lex(module=self, errorlog=lex.NullLogger())
 
-    def skip_whitespace(self):
-        while self.current_char is not None and self.current_char.isspace():
-            self.advance()
+    def t_DECIMAL(self, t):
+        r'\d+\.\d+'
+        t.value = float(t.value)
+        return t
 
-    def integer(self):
-        start_pos = self.pos
-        result = ''
-        while self.current_char is not None and self.current_char.isdigit():
-            result += self.current_char
-            self.advance()
-        return Token(TokenType.INT, int(result), start_pos)
+    def t_NUMBER(self, t):
+        r'\d+'
+        t.value = int(t.value)
+        return t
 
-    def get_next_token(self):
-        while self.current_char is not None:
-            if self.current_char.isspace():
-                self.skip_whitespace()
-                continue
+    def t_ID(self, t):
+        r'[A-Za-z_][A-Za-z_0-9]*'
+        t.type = RESERVADAS.get(t.value, 'ID')
+        return t
 
-            if self.current_char.isdigit():
-                return self.integer()
+    def t_newline(self, t):
+        r'\n+'
+        t.lexer.lineno += len(t.value)
 
-            if self.current_char == '+':
-                token = Token(TokenType.PLUS, '+', self.pos)
-                self.advance()
-                return token
+    def t_error(self, t):
+        # Se registra y se continúa: así se reportan TODOS los caracteres ilegales.
+        self.errores.append((t.value[0], t.lexpos, t.lexer.lineno))
+        t.lexer.skip(1)
 
-            if self.current_char == '-':
-                token = Token(TokenType.MINUS, '-', self.pos)
-                self.advance()
-                return token
-
-            if self.current_char == '*':
-                token = Token(TokenType.MUL, '*', self.pos)
-                self.advance()
-                return token
-
-            if self.current_char == '/':
-                token = Token(TokenType.DIV, '/', self.pos)
-                self.advance()
-                return token
-
-            if self.current_char == '(':
-                token = Token(TokenType.LPAREN, '(', self.pos)
-                self.advance()
-                return token
-
-            if self.current_char == ')':
-                token = Token(TokenType.RPAREN, ')', self.pos)
-                self.advance()
-                return token
-
-            # Error Léxico: Carácter no permitido
-            char = self.current_char
-            pos = self.pos
-            self.advance()
-            raise LexicalError(
-                f"Carácter no válido '{char}' encontrado en la posición {pos}.",
-                pos,
-                char
-            )
-
-        return Token(TokenType.EOF, None, self.pos)
-
-    def tokenize_all(self):
-        tokens = []
-        lexer_clone = Lexer(self.text)
-        while True:
-            token = lexer_clone.get_next_token()
-            tokens.append(token)
-            if token.type == TokenType.EOF:
-                break
-        return tokens
+    def tokenizar(self, texto, linea):
+        self.errores = []
+        self.lexer.lineno = linea
+        self.lexer.input(texto)
+        toks = list(iter(self.lexer.token, None))
+        return toks, list(self.errores)
 
 
 # =====================================================================
-# Nodos del Árbol de Sintaxis Abstracta (AST)
+# Nodos del AST (con atributos sintetizados: tipo y valor)
 # =====================================================================
-class AST:
-    def to_dict(self):
-        raise NotImplementedError()
+class Nodo:
+    kind = 'stmt'
 
-    def to_ascii(self, prefix="", is_last=True):
-        raise NotImplementedError()
+    def __init__(self, linea=0, pos=0):
+        self.linea, self.pos = linea, pos
+        self.tipo = None
+        self.valor = None
 
-
-class NumNode(AST):
-    def __init__(self, token):
-        self.token = token
-        self.value = token.value
-
-    def __repr__(self):
-        return f"NumNode({self.value})"
+    def etiqueta(self): return type(self).__name__
+    def corto(self): return self.etiqueta()
+    def hijos(self): return []
 
     def to_dict(self):
-        return {
-            'type': 'Num',
-            'value': self.value,
-            'position': self.token.position
-        }
+        return {'label': self.etiqueta(), 'short': self.corto(), 'kind': self.kind,
+                'tipo': self.tipo, 'children': [h.to_dict() for h in self.hijos()]}
 
-    def to_ascii(self, prefix="", is_last=True):
-        marker = "└── " if is_last else "├── "
-        return f"{prefix}{marker}Num({self.value})\n"
+    def to_ascii(self, prefix="", last=True):
+        txt = f"{prefix}{'└── ' if last else '├── '}{self.etiqueta()}"
+        txt += f" : {self.tipo}\n" if self.tipo else "\n"
+        nuevo = prefix + ("    " if last else "│   ")
+        hs = self.hijos()
+        for i, h in enumerate(hs):
+            txt += h.to_ascii(nuevo, i == len(hs) - 1)
+        return txt
 
 
-class BinOpNode(AST):
-    def __init__(self, left, op_token, right):
-        self.left = left
-        self.op_token = op_token
-        self.op = op_token.value
-        self.right = right
+class Num(Nodo):
+    kind = 'num'
+    def __init__(self, v, l, p): super().__init__(l, p); self.value = v
+    def etiqueta(self): return f"Num({self.value})"
+    def corto(self): return str(self.value)
 
-    def __repr__(self):
-        return f"BinOpNode({self.left}, {self.op}, {self.right})"
 
-    def to_dict(self):
-        return {
-            'type': 'BinOp',
-            'op': self.op,
-            'position': self.op_token.position,
-            'left': self.left.to_dict(),
-            'right': self.right.to_dict()
-        }
+class Var(Nodo):
+    kind = 'var'
+    def __init__(self, n, l, p): super().__init__(l, p); self.name = n
+    def etiqueta(self): return f"Id({self.name})"
+    def corto(self): return self.name
 
-    def to_ascii(self, prefix="", is_last=True):
-        marker = "└── " if is_last else "├── "
-        result = f"{prefix}{marker}Op({self.op})\n"
-        
-        # Preparar prefijo para los hijos
-        new_prefix = prefix + ("    " if is_last else "│   ")
-        
-        # Dibujar hijos
-        result += self.left.to_ascii(new_prefix, is_last=False)
-        result += self.right.to_ascii(new_prefix, is_last=True)
-        
-        return result
+
+class BinOp(Nodo):
+    kind = 'op'
+    def __init__(self, op, a, b, l, p): super().__init__(l, p); self.op, self.left, self.right = op, a, b
+    def etiqueta(self): return f"Op({self.op})"
+    def corto(self): return self.op
+    def hijos(self): return [self.left, self.right]
+
+
+class Unary(Nodo):
+    kind = 'op'
+    def __init__(self, op, e, l, p): super().__init__(l, p); self.op, self.expr = op, e
+    def etiqueta(self): return f"Neg({self.op})"
+    def corto(self): return self.op
+    def hijos(self): return [self.expr]
+
+
+class Assign(Nodo):
+    def __init__(self, n, e, l, p): super().__init__(l, p); self.name, self.expr = n, e
+    def etiqueta(self): return f"Asignar({self.name})"
+    def corto(self): return f"{self.name}="
+    def hijos(self): return [self.expr]
+
+
+class Evaluar(Nodo):
+    def __init__(self, e, l, p): super().__init__(l, p); self.expr = e
+    def etiqueta(self): return "Evaluar"
+    def hijos(self): return [self.expr]
 
 
 # =====================================================================
-# Analizador Sintáctico (Parser)
+# Analizador sintáctico (PLY / yacc)
 # =====================================================================
-class Parser:
-    def __init__(self, lexer):
-        self.lexer = lexer
-        self.current_token = self.lexer.get_next_token()
+class Sintactico:
+    tokens = TOKENS
+    precedence = (
+        ('left', 'PLUS', 'MINUS'),
+        ('left', 'TIMES', 'DIVIDE'),
+        ('right', 'UMINUS'),
+    )
+    start = 'linea'
 
-    def error(self, message):
-        raise SyntacticError(message, self.current_token.position, self.current_token)
+    def __init__(self):
+        self.error = None
+        self.parser = yacc.yacc(module=self, write_tables=False, debug=False,
+                                errorlog=yacc.NullLogger())
 
-    def consume(self, token_type):
-        if self.current_token.type == token_type:
-            self.current_token = self.lexer.get_next_token()
+    def p_linea(self, p):
+        '''linea : sentencia
+                 | sentencia SEMI'''
+        p[0] = p[1]
+
+    def p_sentencia_asignacion(self, p):
+        'sentencia : ID EQUAL expr'
+        p[0] = Assign(p[1], p[3], p.lineno(1), p.lexpos(1))
+
+    def p_sentencia_evaluar(self, p):
+        'sentencia : EVALUAR LBRACKET expr RBRACKET'
+        p[0] = Evaluar(p[3], p.lineno(1), p.lexpos(1))
+
+    def p_sentencia_expr(self, p):
+        'sentencia : expr'
+        p[0] = p[1]
+
+    def p_expr_binaria(self, p):
+        '''expr : expr PLUS expr
+                | expr MINUS expr
+                | expr TIMES expr
+                | expr DIVIDE expr'''
+        p[0] = BinOp(p[2], p[1], p[3], p.lineno(2), p.lexpos(2))
+
+    def p_expr_unaria(self, p):
+        'expr : MINUS expr %prec UMINUS'
+        p[0] = Unary('-', p[2], p.lineno(1), p.lexpos(1))
+
+    def p_expr_grupo(self, p):
+        'expr : LPAREN expr RPAREN'
+        p[0] = p[2]
+
+    def p_expr_numero(self, p):
+        '''expr : NUMBER
+                | DECIMAL'''
+        p[0] = Num(p[1], p.lineno(1), p.lexpos(1))
+
+    def p_expr_id(self, p):
+        'expr : ID'
+        p[0] = Var(p[1], p.lineno(1), p.lexpos(1))
+
+    def p_error(self, p):
+        if self.error is None:      # solo el primer error
+            self.error = p if p else 'EOF'
+
+    def analizar(self, texto, lexer):
+        self.error = None
+        arbol = self.parser.parse(texto, lexer=lexer)
+        return (None if self.error is not None else arbol), self.error
+
+
+# =====================================================================
+# Tabla de símbolos + analizador semántico
+# =====================================================================
+class TablaSimbolos:
+    def __init__(self):
+        self.entradas = {}
+        self.siguiente = 0
+
+    def insertar(self, nombre, tipo, valor, linea):
+        e = self.entradas.get(nombre)
+        if e is None:
+            self.entradas[nombre] = {'lexema': nombre, 'tipo': tipo, 'ambito': 'global',
+                                     'direccion': self.siguiente, 'valor': valor,
+                                     'linea_decl': linea, 'lineas_ref': []}
+            self.siguiente += TAMANO[tipo]
         else:
-            self.error(f"Se esperaba token {token_type}, pero se obtuvo {self.current_token.type}")
+            e['tipo'], e['valor'] = tipo, valor
 
-    def factor(self):
-        """factor : INT | LPAREN expr RPAREN"""
-        token = self.current_token
-        if token.type == TokenType.INT:
-            self.consume(TokenType.INT)
-            return NumNode(token)
-        elif token.type == TokenType.LPAREN:
-            self.consume(TokenType.LPAREN)
-            node = self.expr()
-            if self.current_token.type != TokenType.RPAREN:
-                self.error("Falta paréntesis de cierre ')'")
-            self.consume(TokenType.RPAREN)
-            return node
+    def buscar(self, nombre):
+        return self.entradas.get(nombre)
+
+    def eliminar(self, nombre):
+        return self.entradas.pop(nombre, None)
+
+    def referenciar(self, nombre, linea):
+        refs = self.entradas[nombre]['lineas_ref']
+        if linea not in refs:
+            refs.append(linea)
+
+    def filas(self):
+        return [dict(e) for e in self.entradas.values()]
+
+
+class AnalizadorSemantico:
+    """Calcula los atributos sintetizados tipo y valor y comprueba la corrección semántica."""
+
+    def __init__(self):
+        self.tabla = TablaSimbolos()
+
+    def visitar(self, n):
+        getattr(self, 'v_' + type(n).__name__)(n)
+        return n
+
+    def v_Num(self, n):
+        n.tipo = 'real' if isinstance(n.value, float) else 'entero'
+        n.valor = n.value
+
+    def v_Var(self, n):
+        e = self.tabla.buscar(n.name)
+        if e is None:
+            raise SemanticError(f"Identificador no declarado: '{n.name}' en la línea {n.linea}, "
+                                f"columna {n.pos + 1}.", n.pos, n.linea)
+        self.tabla.referenciar(n.name, n.linea)
+        n.tipo, n.valor = e['tipo'], e['valor']
+
+    def v_Unary(self, n):
+        self.visitar(n.expr)
+        n.tipo, n.valor = n.expr.tipo, -n.expr.valor
+
+    def v_BinOp(self, n):
+        self.visitar(n.left)
+        self.visitar(n.right)
+        a, b = n.left.valor, n.right.valor
+        if n.op == '/' and b == 0:
+            raise SemanticError(f"División por cero en la línea {n.linea}, columna {n.pos + 1}.",
+                                n.pos, n.linea)
+        n.valor = {'+': a + b, '-': a - b, '*': a * b, '/': (a / b if b else 0)}[n.op]
+        # '/' siempre produce real; el resto promueve a real si algún operando lo es
+        n.tipo = 'real' if (n.op == '/' or 'real' in (n.left.tipo, n.right.tipo)) else 'entero'
+
+    def v_Assign(self, n):
+        self.visitar(n.expr)
+        n.tipo, n.valor = n.expr.tipo, n.expr.valor
+        self.tabla.insertar(n.name, n.tipo, n.valor, n.linea)
+
+    def v_Evaluar(self, n):
+        self.visitar(n.expr)
+        n.tipo, n.valor = n.expr.tipo, n.expr.valor
+
+
+# =====================================================================
+# Orquestación
+# =====================================================================
+_lexico = _sintactico = None
+
+
+def _limpio(v):
+    return round(v, 10) if isinstance(v, float) else v
+
+
+def _err(fase, msg, pos, linea, **extra):
+    d = {'phase': fase, 'message': msg, 'position': pos, 'line': linea, 'column': pos + 1}
+    d.update(extra)
+    return d
+
+
+def _procesar_linea(lx, ps, sem, texto, num):
+    res = {'line': num, 'text': texto, 'status': 'ok', 'tokens': [], 'errors': [],
+           'ast': None, 'ast_ascii': '', 'valor': None, 'tipo': None}
+    toks, errs = lx.tokenizar(texto, num)
+    res['tokens'] = [{'type': t.type, 'value': t.value, 'line': t.lineno, 'position': t.lexpos}
+                     for t in toks]
+    if errs:
+        res['status'] = 'lexical_error'
+        res['errors'] = [_err('Error léxico', f"Carácter ilegal '{c}' en la línea {l}, columna {p + 1}.",
+                              p, l, char=c) for c, p, l in errs]
+        return res
+
+    arbol, error = ps.analizar(texto, lx.lexer)
+    if arbol is None:
+        res['status'] = 'syntax_error'
+        if error == 'EOF' or error is None:
+            res['errors'] = [_err('Error sintáctico', "La instrucción terminó inesperadamente "
+                                  "(falta un operando o un cierre).", len(texto), num)]
         else:
-            self.error(f"Se esperaba un número o un paréntesis de apertura, pero se encontró '{token.value or token.type}'")
+            res['errors'] = [_err('Error sintáctico',
+                                  f"Token inesperado '{error.value}' ({error.type}) en la línea "
+                                  f"{num}, columna {error.lexpos + 1}.", error.lexpos, num)]
+        return res
 
-    def term(self):
-        """term : factor ((MUL | DIV) factor)*"""
-        node = self.factor()
-
-        while self.current_token.type in (TokenType.MUL, TokenType.DIV):
-            token = self.current_token
-            if token.type == TokenType.MUL:
-                self.consume(TokenType.MUL)
-            elif token.type == TokenType.DIV:
-                self.consume(TokenType.DIV)
-            node = BinOpNode(left=node, op_token=token, right=self.factor())
-
-        return node
-
-    def expr(self):
-        """expr : term ((PLUS | MINUS) term)*"""
-        node = self.term()
-
-        while self.current_token.type in (TokenType.PLUS, TokenType.MINUS):
-            token = self.current_token
-            if token.type == TokenType.PLUS:
-                self.consume(TokenType.PLUS)
-            elif token.type == TokenType.MINUS:
-                self.consume(TokenType.MINUS)
-            node = BinOpNode(left=node, op_token=token, right=self.term())
-
-        return node
-
-    def parse(self):
-        node = self.expr()
-        if self.current_token.type != TokenType.EOF:
-            self.error(f"Carácter inesperado o fin de expresión no alcanzado. Token sobrante: {self.current_token}")
-        return node
+    try:
+        sem.visitar(arbol)
+        res['valor'], res['tipo'] = _limpio(arbol.valor), arbol.tipo
+    except SemanticError as e:
+        res['status'] = 'semantic_error'
+        res['errors'] = [_err('Error semántico', e.args[0], e.position, e.line)]
+    res['ast'] = arbol.to_dict()
+    res['ast_ascii'] = arbol.to_ascii()
+    return res
 
 
-# =====================================================================
-# Analizador Semántico (SemanticAnalyzer)
-# =====================================================================
-class SemanticAnalyzer:
-    def __init__(self, ast):
-        self.ast = ast
-        self.symbol_table = {}
-        self.type_table = {}
-
-    def analyze(self):
-        # Encontrar todos los operandos (números) únicos
-        unique_numbers = sorted(list(self._collect_numbers(self.ast)))
-        
-        # Construir Tabla de Símbolos y de Tipos
-        for i, num in enumerate(unique_numbers, start=1):
-            addr = f"dir_{i}"
-            self.symbol_table[num] = addr
-            self.type_table[num] = "entero"
-            
-        return self.symbol_table, self.type_table
-
-    def _collect_numbers(self, node):
-        numbers = set()
-        if isinstance(node, NumNode):
-            numbers.add(node.value)
-        elif isinstance(node, BinOpNode):
-            numbers.update(self._collect_numbers(node.left))
-            numbers.update(self._collect_numbers(node.right))
-        return numbers
+def compilar(texto):
+    """Compila un programa (una instrucción por línea). Devuelve un dict serializable a JSON."""
+    global _lexico, _sintactico
+    if _lexico is None:
+        _lexico, _sintactico = Lexico(), Sintactico()
+    sem = AnalizadorSemantico()
+    lineas = [_procesar_linea(_lexico, _sintactico, sem, l.rstrip('\r'), i)
+              for i, l in enumerate((texto or '').split('\n'), 1) if l.strip()]
+    if not lineas:
+        return {'status': 'empty', 'message': 'Ingresa al menos una expresión.'}
+    tabla = sem.tabla.filas()
+    for f in tabla:
+        f['valor'] = _limpio(f['valor'])
+    ok = all(l['status'] == 'ok' for l in lineas)
+    return {'status': 'success' if ok else 'error', 'lines': lineas,
+            'symbol_table': tabla}
