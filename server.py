@@ -19,14 +19,14 @@ class handler(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        # Enrutar la raíz a index.html usando ruta absoluta
+        # Enrutar la raíz directamente a index.html en la raíz del proyecto
         path = self.path
         if path == '/' or path == '/index.html':
-            filepath = os.path.join(BASE_DIR, 'templates', 'index.html')
+            filepath = os.path.join(BASE_DIR, 'index.html')
             self.serve_file(filepath, 'text/html')
         else:
             filename = os.path.basename(path)
-            filepath = os.path.join(BASE_DIR, 'templates', filename)
+            filepath = os.path.join(BASE_DIR, filename)
             
             if os.path.exists(filepath) and os.path.isfile(filepath):
                 ext = os.path.splitext(filename)[1].lower()
@@ -161,10 +161,6 @@ class handler(http.server.BaseHTTPRequestHandler):
         }
 
 def run_server(port=PORT):
-    templates_dir = os.path.join(BASE_DIR, 'templates')
-    if not os.path.exists(templates_dir):
-        os.makedirs(templates_dir)
-        
     server_address = ('', port)
     httpd = http.server.HTTPServer(server_address, handler)
     print(f"Servidor web local ejecutándose en http://localhost:{port}")
