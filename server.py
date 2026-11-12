@@ -9,7 +9,7 @@ from compiler import Lexer, Parser, SemanticAnalyzer, LexicalError, SyntacticErr
 
 PORT = 8000
 
-class CompilerHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
+class handler(http.server.BaseHTTPRequestHandler):
     
     def log_message(self, format, *args):
         # Deshabilitar logs ruidosos en consola
@@ -21,8 +21,6 @@ class CompilerHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         if path == '/' or path == '/index.html':
             self.serve_file('templates/index.html', 'text/html')
         else:
-            # Intentar servir el archivo solicitado si está en templates o estáticos
-            # (Por seguridad y simplicidad, solo servimos archivos específicos de templates)
             filename = os.path.basename(path)
             filepath = os.path.join('templates', filename)
             
@@ -128,13 +126,10 @@ class CompilerHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         try:
             analyzer = SemanticAnalyzer(ast_root)
             sym_table, type_table = analyzer.analyze()
-            # Convertir tablas a formato lista de diccionarios para visualización fácil
-            # Tabla de Símbolos: [{'symbol': 10, 'address': 'dir_1'}, ...]
-            # Ordenados por dirección secuencial
+            
             formatted_sym_table = []
             formatted_type_table = []
             
-            # Ordenar por el número de dirección (extraer el entero de "dir_X")
             sorted_symbols = sorted(sym_table.items(), key=lambda item: int(item[1].split('_')[1]))
             
             for symbol, addr in sorted_symbols:
@@ -162,12 +157,11 @@ class CompilerHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         }
 
 def run_server(port=PORT):
-    # Asegurar que exista la carpeta templates
     if not os.path.exists('templates'):
         os.makedirs('templates')
         
     server_address = ('', port)
-    httpd = http.server.HTTPServer(server_address, CompilerHTTPRequestHandler)
+    httpd = http.server.HTTPServer(server_address, handler)
     print(f"Servidor web local ejecutándose en http://localhost:{port}")
     try:
         httpd.serve_forever()
