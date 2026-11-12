@@ -7,6 +7,9 @@ import json
 import urllib.parse
 from compiler import Lexer, Parser, SemanticAnalyzer, LexicalError, SyntacticError
 
+# Directorio base absoluto para que Vercel y local encuentren los archivos
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 PORT = 8000
 
 class handler(http.server.BaseHTTPRequestHandler):
@@ -16,13 +19,14 @@ class handler(http.server.BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        # Enrutar la raíz a index.html
+        # Enrutar la raíz a index.html usando ruta absoluta
         path = self.path
         if path == '/' or path == '/index.html':
-            self.serve_file('templates/index.html', 'text/html')
+            filepath = os.path.join(BASE_DIR, 'templates', 'index.html')
+            self.serve_file(filepath, 'text/html')
         else:
             filename = os.path.basename(path)
-            filepath = os.path.join('templates', filename)
+            filepath = os.path.join(BASE_DIR, 'templates', filename)
             
             if os.path.exists(filepath) and os.path.isfile(filepath):
                 ext = os.path.splitext(filename)[1].lower()
@@ -157,8 +161,9 @@ class handler(http.server.BaseHTTPRequestHandler):
         }
 
 def run_server(port=PORT):
-    if not os.path.exists('templates'):
-        os.makedirs('templates')
+    templates_dir = os.path.join(BASE_DIR, 'templates')
+    if not os.path.exists(templates_dir):
+        os.makedirs(templates_dir)
         
     server_address = ('', port)
     httpd = http.server.HTTPServer(server_address, handler)
