@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Compilador Aritmético</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f2937;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --accent: #a855f7;
+            --accent-glow: rgba(168, 85, 247, 0.15);
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.15);
+            --amber: #f59e0b;
+            --rose: #f43f5e;
+            --rose-glow: rgba(244, 63, 94, 0.15);
+            --border: rgba(255, 255, 255, 0.08);
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --card-blur: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(11, 15, 25, 0.5);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+        }
+
+        .header-title h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .header-title p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.1rem;
+        }
+
+        .badge-uni {
+            font-size: 0.75rem;
+            background: var(--border);
+            padding: 0.4rem 0.8rem;
+            border-radius: 99px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        main {
+            flex: 1;
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Izquierdo: Entrada y Controles */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(var(--card-blur));
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.25);
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title svg {
+            color: var(--primary);
+        }
+
+        /* Input Form */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 1rem 1.2rem;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'Fira Code', monospace;
+            font-size: 1rem;
+            transition: var(--transition);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .btn-compile {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-compile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-compile:active {
+            transform: translateY(0);
+        }
+
+        /* Ejemplos Rápidos */
+        .examples-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .example-chip {
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-family: 'Fira Code', monospace;
+        }
+
+        .example-chip:hover {
+            background: var(--primary-glow);
+            border-color: var(--primary);
+            color: var(--text-primary);
+        }
+
+        /* Tabla de Símbolos y Tipos */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        th {
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge-addr {
+            font-family: 'Fira Code', monospace;
+            background: var(--accent-glow);
+            color: #d8b4fe;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(168, 85, 247, 0.2);
+        }
+
+        .badge-type {
+            background: var(--emerald-glow);
+            color: #6ee7b7;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .empty-table-text {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 1.5rem 0;
+            font-style: italic;
+        }
+
+        /* Panel Derecho: Visualización */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Visualización de Tokens */
+        .tokens-track {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            min-height: 50px;
+        }
+
+        .token-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.5rem 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            align-items: center;
+            min-width: 70px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            opacity: 0;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8) translateY(10px);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .token-val {
+            font-family: 'Fira Code', monospace;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .token-type-lbl {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Tipos de Tokens Colores */
+        .token-card.int {
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        .token-card.int .token-val { color: var(--emerald); }
+
+        .token-card.op {
+            border-color: rgba(99, 102, 241, 0.3);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .token-card.op .token-val { color: var(--primary); }
+
+        .token-card.paren {
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(245, 158, 11, 0.05);
+        }
+        .token-card.paren .token-val { color: var(--amber); }
+
+        .token-card.eof {
+            border-color: var(--border);
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .token-card.eof .token-val { color: var(--text-secondary); }
+
+        /* AST Visual Canvas */
+        .ast-viewer-container {
+            display: flex;
+            flex-direction: column;
+            height: 480px;
+            position: relative;
+        }
+
+        .ast-tab-header {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .ast-tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .ast-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .ast-content-pane {
+            flex: 1;
+            display: none;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px dashed rgba(255, 255, 255, 0.05);
+            overflow: auto;
+            position: relative;
+        }
+
+        .ast-content-pane.active {
+            display: block;
+        }
+
+        .ast-svg-canvas {
+            width: 100%;
+            height: 100%;
+            min-height: 380px;
+            display: block;
+        }
+
+        .ast-ascii-pre {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            padding: 1.5rem;
+            color: #38bdf8;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        /* Error Panel */
+        .error-panel {
+            background: var(--rose-glow);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            display: none;
+            flex-direction: column;
+            gap: 0.75rem;
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+
+        .error-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--rose);
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .error-msg {
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .error-highlight {
+            font-family: 'Fira Code', monospace;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            position: relative;
+            overflow-x: auto;
+            border-left: 3px solid var(--rose);
+        }
+
+        .error-pointer {
+            color: var(--rose);
+            font-weight: 900;
+        }
+
+        /* Footer */
+        footer {
+            padding: 1.5rem;
+            text-align: center;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            background-color: rgba(11, 15, 25, 0.3);
+            margin-top: auto;
+        }
+
+        /* SVG Node Styling */
+        .node-circle {
+            fill: #1e293b;
+            stroke: var(--primary);
+            stroke-width: 2.5px;
+            transition: var(--transition);
+        }
+
+        .node-circle.op-node {
+            stroke: var(--primary);
+            fill: #1e1b4b;
+        }
+
+        .node-circle.num-node {
+            stroke: var(--emerald);
+            fill: #064e3b;
+        }
+
+        .node-text {
+            font-family: 'Outfit', sans-serif;
+            fill: white;
+            font-weight: 700;
+            font-size: 14px;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        .edge-line {
+            stroke: rgba(255, 255, 255, 0.15);
+            stroke-width: 2px;
+            stroke-dasharray: 4, 4;
+            animation: dash 30s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -1000;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <h1>Simulador de Compilador Aritmético</h1>
+            <p>Visualizador interactivo de las etapas iniciales de compilación</p>
+        </div>
+        <div class="badge-uni">Universidad Simón Bolívar</div>
+    </header>
+
+    <main>
+        <!-- Columna Izquierda: Entrada y Tablas Semánticas -->
+        <section class="sidebar">
+            <!-- Tarjeta 1: Entrada -->
+            <div class="card">
+                <h2 class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Expresión de Entrada
+                </h2>
+                
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <input type="text" id="expression-input" placeholder="Ej: 10 + 20 * (30 - 5)" value="10 + 20 * (30 - 5)">
+                    </div>
+                    
+                    <button class="btn-compile" id="compile-btn">
+                        <span>Compilar Expresión</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem;">Prueba con estos ejemplos:</p>
+                    <div class="examples-list">
+                        <span class="example-chip" onclick="loadExample('10 + 25')">10 + 25</span>
+                        <span class="example-chip" onclick="loadExample('2 * 3 + 4 / 2')">2 * 3 + 4 / 2</span>
+                        <span class="example-chip" onclick="loadExample('100 * (5 - 3) / 2')">100 * (5 - 3) / 2</span>
+                        <span class="example-chip" onclick="loadExample('10 + 2a * 3')">Error Léxico (2a)</span>
+                        <span class="example-chip" onclick="loadExample('5 + * 3')">Error Sintáctico</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 2: Análisis Semántico (Tablas) -->
+            <div class="card" style="flex: 1;">
+                <h2 class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4c0-.5.2-1 .6-1.4C5 2.2 5.5 2 6 2h12c.5 0 1 .2 1.4.6.4.4.6.9.6 1.4v18l-4-2-4 2-4-2Z"/><path d="M15 6H9"/><path d="M15 10H9"/><path d="M15 14H9"/></svg>
+                    Análisis Semántico
+                </h2>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #a855f7;">Tabla de Símbolos</h3>
+                    <div class="table-container">
+                        <table id="symbol-table">
+                            <thead>
+                                <tr>
+                                    <th>Símbolo (Valor)</th>
+                                    <th>Dirección de Memoria</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="2" class="empty-table-text">No hay símbolos analizados</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #10b981;">Tabla de Tipos</h3>
+                    <div class="table-container">
+                        <table id="type-table">
+                            <thead>
+                                <tr>
+                                    <th>Símbolo</th>
+                                    <th>Tipo de Dato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="2" class="empty-table-text">No hay tipos analizados</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Columna Derecha: Output Visual del Compilador -->
+        <section class="workspace">
+            
+            <!-- Alerta de Errores -->
+            <div class="error-panel" id="error-panel">
+                <div class="error-header">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span id="error-title">Error Detectado</span>
+                </div>
+                <div class="error-msg" id="error-msg">Mensaje de error descriptivo...</div>
+                <div class="error-highlight" id="error-highlight">
+                    <div>10 + 2a * 3</div>
+                    <div class="error-pointer">       ^</div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 3: Analizador Léxico (Tokens) -->
+            <div class="card">
+                <h2 class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+                    Fase 1: Analizador Léxico (Tokens Generados)
+                </h2>
+                <div class="tokens-track" id="tokens-track">
+                    <div style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; width: 100%; text-align: center; padding: 1rem 0;">
+                        Los tokens aparecerán aquí tras compilar la expresión
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tarjeta 4: Analizador Sintáctico (AST) -->
+            <div class="card ast-viewer-container">
+                <h2 class="card-title" style="margin-bottom: 0.5rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    Fase 2: Analizador Sintáctico (Árbol de Sintaxis Abstracta)
+                </h2>
+                
+                <div class="ast-tab-header">
+                    <div class="ast-tab active" onclick="switchASTTab('graph')">Gráfico AST (SVG)</div>
+                    <div class="ast-tab" onclick="switchASTTab('ascii')">Formato Texto (Árbol ASCII)</div>
+                </div>
+
+                <div class="ast-content-pane active" id="ast-graph-pane">
+                    <svg class="ast-svg-canvas" id="ast-svg">
+                        <!-- Nodos y aristas dinámicos se insertarán aquí -->
+                    </svg>
+                </div>
+                
+                <div class="ast-content-pane" id="ast-ascii-pane">
+                    <pre class="ast-ascii-pre" id="ast-ascii-code">El AST en formato de texto se mostrará aquí...</pre>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <footer>
+        Proyecto Final de Compiladores &copy; 2026 - Universidad Simón Bolívar.
+    </footer>
+
+    <script>
+        // =====================================================================
+        // MOTOR DEL COMPILADOR EN JAVASCRIPT (EJECUCIÓN NATIVA EN EL NAVEGADOR)
+        // =====================================================================
+
+        const TokenType = {
+            INT: 'ENTERO',
+            PLUS: 'MAS',
+            MINUS: 'MENOS',
+            MUL: 'MULTIPLICACION',
+            DIV: 'DIVISION',
+            LPAREN: 'PARENTESIS_IZQ',
+            RPAREN: 'PARENTESIS_DER',
+            EOF: 'EOF'
+        };
+
+        class Token {
+            constructor(type, value, position) {
+                this.type = type;
+                this.value = value;
+                this.position = position;
+            }
+            toDict() {
+                return {
+                    type: this.type,
+                    value: this.value,
+                    position: this.position
+                };
+            }
+        }
+
+        class LexicalError extends Error {
+            constructor(message, position, char) {
+                super(message);
+                this.position = position;
+                this.char = char;
+            }
+        }
+
+        class SyntacticError extends Error {
+            constructor(message, position, token) {
+                super(message);
+                this.position = position;
+                this.token = token;
+            }
+        }
+
+        // --- Analizador Léxico (Lexer) ---
+        class Lexer {
+            constructor(text) {
+                this.text = text || '';
+                this.pos = 0;
+                this.currentChar = this.text.length > 0 ? this.text[0] : null;
+            }
+
+            advance() {
+                this.pos++;
+                if (this.pos > this.text.length - 1) {
+                    this.currentChar = null;
+                } else {
+                    this.currentChar = this.text[this.pos];
+                }
+            }
+
+            skipWhitespace() {
+                while (this.currentChar !== null && /\s/.test(this.currentChar)) {
+                    this.advance();
+                }
+            }
+
+            integer() {
+                const startPos = this.pos;
+                let result = '';
+                while (this.currentChar !== null && /[0-9]/.test(this.currentChar)) {
+                    result += this.currentChar;
+                    this.advance();
+                }
+                return new Token(TokenType.INT, parseInt(result, 10), startPos);
+            }
+
+            getNextToken() {
+                while (this.currentChar !== null) {
+                    if (/\s/.test(this.currentChar)) {
+                        this.skipWhitespace();
+                        continue;
+                    }
+
+                    if (/[0-9]/.test(this.currentChar)) {
+                        return this.integer();
+                    }
+
+                    if (this.currentChar === '+') {
+                        const token = new Token(TokenType.PLUS, '+', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    if (this.currentChar === '-') {
+                        const token = new Token(TokenType.MINUS, '-', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    if (this.currentChar === '*') {
+                        const token = new Token(TokenType.MUL, '*', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    if (this.currentChar === '/') {
+                        const token = new Token(TokenType.DIV, '/', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    if (this.currentChar === '(') {
+                        const token = new Token(TokenType.LPAREN, '(', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    if (this.currentChar === ')') {
+                        const token = new Token(TokenType.RPAREN, ')', this.pos);
+                        this.advance();
+                        return token;
+                    }
+
+                    // Carácter no permitido -> Error léxico
+                    const char = this.currentChar;
+                    const pos = this.pos;
+                    this.advance();
+                    throw new LexicalError(
+                        `Carácter no válido '${char}' encontrado en la posición ${pos}.`,
+                        pos,
+                        char
+                    );
+                }
+
+                return new Token(TokenType.EOF, null, this.pos);
+            }
+
+            tokenizeAll() {
+                const tokens = [];
+                const lexerClone = new Lexer(this.text);
+                while (true) {
+                    const token = lexerClone.getNextToken();
+                    tokens.push(token);
+                    if (token.type === TokenType.EOF) {
+                        break;
+                    }
+                }
+                return tokens;
+            }
+        }
+
+        // --- Nodos del AST ---
+        class NumNode {
+            constructor(token) {
+                this.token = token;
+                this.value = token.value;
+            }
+            toDict() {
+                return {
+                    type: 'Num',
+                    value: this.value,
+                    position: this.token.position
+                };
+            }
+            toAscii(prefix = "", isLast = true) {
+                const marker = isLast ? "└── " : "├── ";
+                return `${prefix}${marker}Num(${this.value})\n`;
+            }
+        }
+
+        class BinOpNode {
+            constructor(left, opToken, right) {
+                this.left = left;
+                this.opToken = opToken;
+                this.op = opToken.value;
+                this.right = right;
+            }
+            toDict() {
+                return {
+                    type: 'BinOp',
+                    op: this.op,
+                    position: this.opToken.position,
+                    left: this.left.toDict(),
+                    right: this.right.toDict()
+                };
+            }
+            toAscii(prefix = "", isLast = true) {
+                const marker = isLast ? "└── " : "├── ";
+                let result = `${prefix}${marker}Op(${this.op})\n`;
+                const newPrefix = prefix + (isLast ? "    " : "│   ");
+                result += this.left.toAscii(newPrefix, false);
+                result += this.right.toAscii(newPrefix, true);
+                return result;
+            }
+        }
+
+        // --- Analizador Sintáctico (Parser) ---
+        class Parser {
+            constructor(lexer) {
+                this.lexer = lexer;
+                this.currentToken = this.lexer.getNextToken();
+            }
+
+            error(message) {
+                throw new SyntacticError(message, this.currentToken.position, this.currentToken);
+            }
+
+            consume(tokenType) {
+                if (this.currentToken.type === tokenType) {
+                    this.currentToken = this.lexer.getNextToken();
+                } else {
+                    this.error(`Se esperaba token ${tokenType}, pero se obtuvo ${this.currentToken.type}`);
+                }
+            }
+
+            factor() {
+                const token = this.currentToken;
+                if (token.type === TokenType.INT) {
+                    this.consume(TokenType.INT);
+                    return new NumNode(token);
+                } else if (token.type === TokenType.LPAREN) {
+                    this.consume(TokenType.LPAREN);
+                    const node = this.expr();
+                    if (this.currentToken.type !== TokenType.RPAREN) {
+                        this.error("Falta paréntesis de cierre ')'");
+                    }
+                    this.consume(TokenType.RPAREN);
+                    return node;
+                } else {
+                    this.error(`Se esperaba un número o un paréntesis de apertura, pero se encontró '${token.value !== null && token.value !== undefined ? token.value : token.type}'`);
+                }
+            }
+
+            term() {
+                let node = this.factor();
+                while (this.currentToken.type === TokenType.MUL || this.currentToken.type === TokenType.DIV) {
+                    const token = this.currentToken;
+                    if (token.type === TokenType.MUL) {
+                        this.consume(TokenType.MUL);
+                    } else if (token.type === TokenType.DIV) {
+                        this.consume(TokenType.DIV);
+                    }
+                    node = new BinOpNode(node, token, this.factor());
+                }
+                return node;
+            }
+
+            expr() {
+                let node = this.term();
+                while (this.currentToken.type === TokenType.PLUS || this.currentToken.type === TokenType.MINUS) {
+                    const token = this.currentToken;
+                    if (token.type === TokenType.PLUS) {
+                        this.consume(TokenType.PLUS);
+                    } else if (token.type === TokenType.MINUS) {
+                        this.consume(TokenType.MINUS);
+                    }
+                    node = new BinOpNode(node, token, this.term());
+                }
+                return node;
+            }
+
+            parse() {
+                const node = this.expr();
+                if (this.currentToken.type !== TokenType.EOF) {
+                    this.error(`Carácter inesperado o fin de expresión no alcanzado. Token sobrante: ${this.currentToken.value || this.currentToken.type}`);
+                }
+                return node;
+            }
+        }
+
+        // --- Analizador Semántico (SemanticAnalyzer) ---
+        class SemanticAnalyzer {
+            constructor(ast) {
+                this.ast = ast;
+            }
+
+            collectNumbers(node, set) {
+                if (!node) return;
+                if (node instanceof NumNode) {
+                    set.add(node.value);
+                } else if (node instanceof BinOpNode) {
+                    this.collectNumbers(node.left, set);
+                    this.collectNumbers(node.right, set);
+                }
+            }
+
+            analyze() {
+                const set = new Set();
+                this.collectNumbers(this.ast, set);
+                const uniqueNumbers = Array.from(set).sort((a, b) => a - b);
+                
+                const formattedSymTable = [];
+                const formattedTypeTable = [];
+
+                uniqueNumbers.forEach((num, index) => {
+                    const addr = `dir_${index + 1}`;
+                    formattedSymTable.push({
+                        symbol: num,
+                        address: addr
+                    });
+                    formattedTypeTable.push({
+                        symbol: num,
+                        type: 'entero'
+                    });
+                });
+
+                return {
+                    symbolTable: formattedSymTable,
+                    typeTable: formattedTypeTable
+                };
+            }
+        }
+
+        function runCompilerLocally(expression) {
+            if (!expression || expression.trim() === '') {
+                return {
+                    status: 'error',
+                    message: 'Por favor, ingresa una expresión aritmética.'
+                };
+            }
+
+            // 1. Léxico
+            let tokensList = [];
+            try {
+                const lexer = new Lexer(expression);
+                const tokenObjs = lexer.tokenizeAll();
+                tokensList = tokenObjs.map(t => t.toDict());
+            } catch (le) {
+                if (le instanceof LexicalError) {
+                    return {
+                        status: 'lexical_error',
+                        message: le.message,
+                        position: le.position,
+                        char: le.char
+                    };
+                }
+                return {
+                    status: 'error',
+                    message: `Error léxico desconocido: ${le.message}`
+                };
+            }
+
+            // 2. Sintáctico (AST)
+            let astRoot = null;
+            let astDict = null;
+            let astAscii = '';
+            try {
+                const lexerForParser = new Lexer(expression);
+                const parser = new Parser(lexerForParser);
+                astRoot = parser.parse();
+                astDict = astRoot.toDict();
+                astAscii = astRoot.toAscii();
+            } catch (se) {
+                if (se instanceof SyntacticError) {
+                    return {
+                        status: 'syntax_error',
+                        message: se.message,
+                        position: se.position,
+                        token: se.token ? se.token.toDict() : null
+                    };
+                }
+                return {
+                    status: 'error',
+                    message: `Error sintáctico desconocido: ${se.message}`
+                };
+            }
+
+            // 3. Semántico (Tablas)
+            try {
+                const analyzer = new SemanticAnalyzer(astRoot);
+                const { symbolTable, typeTable } = analyzer.analyze();
+                return {
+                    status: 'success',
+                    tokens: tokensList,
+                    ast: astDict,
+                    ast_ascii: astAscii,
+                    symbol_table: symbolTable,
+                    type_table: typeTable
+                };
+            } catch (e) {
+                return {
+                    status: 'error',
+                    message: `Error semántico: ${e.message}`
+                };
+            }
+        }
+
+        // Cargar ejemplo en la caja de texto
+        function loadExample(val) {
+            document.getElementById('expression-input').value = val;
+            compileExpression();
+        }
+
+        // Cambiar pestañas del AST
+        function switchASTTab(tabName) {
+            const tabs = document.querySelectorAll('.ast-tab');
+            const panes = document.querySelectorAll('.ast-content-pane');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            panes.forEach(p => p.classList.remove('active'));
+
+            if (tabName === 'graph') {
+                tabs[0].classList.add('active');
+                document.getElementById('ast-graph-pane').classList.add('active');
+            } else {
+                tabs[1].classList.add('active');
+                document.getElementById('ast-ascii-pane').classList.add('active');
+            }
+        }
+
+        // Ejecutar compilación directamente en el navegador
+        function compileExpression() {
+            const expr = document.getElementById('expression-input').value;
+            
+            // Limpiar errores e interfaz
+            hideError();
+            
+            try {
+                const result = runCompilerLocally(expr);
+                
+                if (result.status === 'success') {
+                    displayTokens(result.tokens);
+                    displayTables(result.symbol_table, result.type_table);
+                    renderASTGraph(result.ast);
+                    displayASTAscii(result.ast_ascii);
+                } else if (result.status === 'lexical_error') {
+                    displayTokens([]);
+                    displayTables([], []);
+                    clearAST();
+                    showLexicalError(result.message, result.position, result.char, expr);
+                } else if (result.status === 'syntax_error') {
+                    displayTokens([]);
+                    displayTables([], []);
+                    clearAST();
+                    showSyntaxError(result.message, result.position, result.token, expr);
+                } else {
+                    displayTokens([]);
+                    displayTables([], []);
+                    clearAST();
+                    showGeneralError(result.message || 'Error desconocido');
+                }
+            } catch (err) {
+                showGeneralError('Ocurrió un error inesperado al procesar la expresión: ' + err.message);
+            }
+        }
+
+        // Mostrar Tokens
+        function displayTokens(tokens) {
+            const track = document.getElementById('tokens-track');
+            track.innerHTML = '';
+            
+            if (tokens.length === 0) {
+                track.innerHTML = `<div style="color: var(--text-secondary); font-size: 0.85rem; font-style: italic; width: 100%; text-align: center; padding: 1rem 0;">No se generaron tokens.</div>`;
+                return;
+            }
+            
+            tokens.forEach((t, index) => {
+                const card = document.createElement('div');
+                card.className = 'token-card';
+                card.style.animationDelay = `${index * 40}ms`;
+                
+                // Determinar subtipo estético
+                if (t.type === 'ENTERO') {
+                    card.classList.add('int');
+                } else if (['MAS', 'MENOS', 'MULTIPLICACION', 'DIVISION'].includes(t.type)) {
+                    card.classList.add('op');
+                } else if (['PARENTESIS_IZQ', 'PARENTESIS_DER'].includes(t.type)) {
+                    card.classList.add('paren');
+                } else if (t.type === 'EOF') {
+                    card.classList.add('eof');
+                }
+                
+                const valueText = t.value === null ? 'EOF' : t.value;
+                const typeText = translateTokenType(t.type);
+                
+                card.innerHTML = `
+                    <span class="token-val">${escapeHtml(valueText.toString())}</span>
+                    <span class="token-type-lbl">${escapeHtml(typeText)}</span>
+                `;
+                
+                track.appendChild(card);
+            });
+        }
+
+        function translateTokenType(type) {
+            switch(type) {
+                case 'ENTERO': return 'Entero';
+                case 'MAS': return 'Suma';
+                case 'MENOS': return 'Resta';
+                case 'MULTIPLICACION': return 'Multipl.';
+                case 'DIVISION': return 'División';
+                case 'PARENTESIS_IZQ': return 'Par. Izq.';
+                case 'PARENTESIS_DER': return 'Par. Der.';
+                case 'EOF': return 'Fin Arch.';
+                default: return type;
+            }
+        }
+
+        // Mostrar Tablas Semánticas
+        function displayTables(symTable, typeTable) {
+            const symBody = document.querySelector('#symbol-table tbody');
+            const typeBody = document.querySelector('#type-table tbody');
+            
+            symBody.innerHTML = '';
+            typeBody.innerHTML = '';
+            
+            if (symTable.length === 0) {
+                symBody.innerHTML = `<tr><td colspan="2" class="empty-table-text">No hay símbolos analizados</td></tr>`;
+            } else {
+                symTable.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 600;">${row.symbol}</td>
+                        <td><span class="badge-addr">${row.address}</span></td>
+                    `;
+                    symBody.appendChild(tr);
+                });
+            }
+            
+            if (typeTable.length === 0) {
+                typeBody.innerHTML = `<tr><td colspan="2" class="empty-table-text">No hay tipos analizados</td></tr>`;
+            } else {
+                typeTable.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 600;">${row.symbol}</td>
+                        <td><span class="badge-type">${row.type}</span></td>
+                    `;
+                    typeBody.appendChild(tr);
+                });
+            }
+        }
+
+        // Mostrar AST en formato ASCII texto
+        function displayASTAscii(text) {
+            document.getElementById('ast-ascii-code').textContent = text;
+        }
+
+        // Limpiar el AST
+        function clearAST() {
+            document.getElementById('ast-svg').innerHTML = '';
+            document.getElementById('ast-ascii-code').textContent = 'No hay árbol disponible debido a un error.';
+        }
+
+        // Renderizar el AST como un gráfico SVG interactivo
+        function renderASTGraph(astData) {
+            const svg = document.getElementById('ast-svg');
+            svg.innerHTML = '';
+            
+            if (!astData) return;
+
+            // Determinar dimensiones dinámicas del SVG
+            const width = svg.clientWidth || 800;
+            const height = svg.clientHeight || 380;
+            
+            // Paso 1: Computar la profundidad y el ancho de cada subárbol para posicionamiento inteligente
+            function computeLayoutInfo(node) {
+                if (!node) return null;
+                
+                if (node.type === 'Num') {
+                    return {
+                        node: node,
+                        width: 60,
+                        height: 50,
+                        depth: 1
+                    };
+                }
+                
+                const leftLayout = computeLayoutInfo(node.left);
+                const rightLayout = computeLayoutInfo(node.right);
+                
+                return {
+                    node: node,
+                    left: leftLayout,
+                    right: rightLayout,
+                    width: (leftLayout.width + rightLayout.width) + 40,
+                    height: Math.max(leftLayout.height, rightLayout.height) + 80,
+                    depth: Math.max(leftLayout.depth, rightLayout.depth) + 1
+                };
+            }
+            
+            const layout = computeLayoutInfo(astData);
+            
+            // Ajustar el viewBox para que el árbol se auto-ajuste y sea responsivo
+            svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            
+            // Paso 2: Dibujar el árbol recursivamente
+            const verticalSpacing = height / (layout.depth + 0.5 || 2);
+            
+            function drawNode(nodeLayout, x, y, parentX = null, parentY = null) {
+                if (!nodeLayout) return;
+                
+                // Si hay nodo padre, dibujar línea de conexión (arista) primero para que quede debajo de las esferas
+                if (parentX !== null && parentY !== null) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', parentX);
+                    line.setAttribute('y1', parentY);
+                    line.setAttribute('x2', x);
+                    line.setAttribute('y2', y);
+                    line.setAttribute('class', 'edge-line');
+                    svg.appendChild(line);
+                }
+                
+                const node = nodeLayout.node;
+                const isOp = node.type === 'BinOp';
+                
+                // Dibujar círculo del nodo
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', isOp ? 22 : 18);
+                circle.setAttribute('class', `node-circle ${isOp ? 'op-node' : 'num-node'}`);
+                
+                // Animación hover interactiva
+                circle.addEventListener('mouseover', () => {
+                    circle.style.transform = 'scale(1.15)';
+                    circle.style.transformOrigin = `${x}px ${y}px`;
+                    circle.style.filter = 'drop-shadow(0 0 8px var(--primary))';
+                });
+                circle.addEventListener('mouseout', () => {
+                    circle.style.transform = 'scale(1)';
+                    circle.style.filter = 'none';
+                });
+                
+                // Texto del nodo
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x);
+                text.setAttribute('y', y);
+                text.setAttribute('class', 'node-text');
+                text.textContent = isOp ? node.op : node.value;
+                
+                // Si es un operador, agregar title tooltip
+                if (isOp) {
+                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    title.textContent = `Operador: ${node.op}`;
+                    circle.appendChild(title);
+                } else {
+                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    title.textContent = `Valor constante: ${node.value}`;
+                    circle.appendChild(title);
+                }
+                
+                // Dibujar hijos recursivamente distribuyendo el ancho disponible
+                if (isOp) {
+                    const leftWidth = nodeLayout.left.width;
+                    const rightWidth = nodeLayout.right.width;
+                    const totalChildWidth = leftWidth + rightWidth;
+                    
+                    // El espacio horizontal total asignado a este subárbol
+                    const childSpacingFactor = Math.min(150, (width * 0.8) / Math.pow(2, y / verticalSpacing));
+                    
+                    const leftX = x - childSpacingFactor;
+                    const rightX = x + childSpacingFactor;
+                    const childY = y + verticalSpacing;
+                    
+                    drawNode(nodeLayout.left, leftX, childY, x, y);
+                    drawNode(nodeLayout.right, rightX, childY, x, y);
+                }
+                
+                // Agregar círculo y texto al SVG
+                svg.appendChild(circle);
+                svg.appendChild(text);
+            }
+            
+            // Iniciar dibujo desde la raíz en el centro superior
+            drawNode(layout, width / 2, 40);
+        }
+
+        // Manejo de Errores Visuales
+        function showLexicalError(message, position, char, originalExpr) {
+            const panel = document.getElementById('error-panel');
+            document.getElementById('error-title').textContent = 'Error Léxico Encontrado';
+            document.getElementById('error-msg').textContent = message;
+            
+            // Generar el puntero en texto monoespaciado
+            let pointerLine = '';
+            for (let i = 0; i < position; i++) {
+                pointerLine += ' ';
+            }
+            pointerLine += '^';
+            
+            const highlightHtml = `<div>${escapeHtml(originalExpr)}</div><div class="error-pointer">${escapeHtml(pointerLine)}</div>`;
+            document.getElementById('error-highlight').innerHTML = highlightHtml;
+            
+            panel.style.display = 'flex';
+        }
+
+        function showSyntaxError(message, position, token, originalExpr) {
+            const panel = document.getElementById('error-panel');
+            document.getElementById('error-title').textContent = 'Error Sintáctico Encontrado';
+            document.getElementById('error-msg').textContent = message;
+            
+            let pointerLine = '';
+            for (let i = 0; i < position; i++) {
+                pointerLine += ' ';
+            }
+            pointerLine += '^';
+            
+            const highlightHtml = `<div>${escapeHtml(originalExpr)}</div><div class="error-pointer">${escapeHtml(pointerLine)}</div>`;
+            document.getElementById('error-highlight').innerHTML = highlightHtml;
+            
+            panel.style.display = 'flex';
+        }
+
+        function showGeneralError(message) {
+            const panel = document.getElementById('error-panel');
+            document.getElementById('error-title').textContent = 'Error General';
+            document.getElementById('error-msg').textContent = message;
+            document.getElementById('error-highlight').innerHTML = '';
+            panel.style.display = 'flex';
+        }
+
+        function hideError() {
+            document.getElementById('error-panel').style.display = 'none';
+        }
+
+        // Helpers de escape HTML
+        function escapeHtml(str) {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Agregar listener de click al botón
+        document.getElementById('compile-btn').addEventListener('click', compileExpression);
+        
+        // Agregar listener de enter en el input
+        document.getElementById('expression-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                compileExpression();
+            }
+        });
+
+        // Ejecutar compilación inicial al cargar
+        window.addEventListener('load', () => {
+            compileExpression();
+        });
+    </script>
+</body>
+</html>
